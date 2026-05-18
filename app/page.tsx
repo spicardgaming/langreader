@@ -45,7 +45,11 @@ function getParagraphFromRange(range: Range): HTMLParagraphElement | null {
   if (node.nodeType === Node.TEXT_NODE) {
     node = node.parentElement;
   }
-  return (node as Element | null)?.closest("p[data-paragraph]");
+  if (!(node instanceof Element)) {
+    return null;
+  }
+  const paragraph = node.closest("p[data-paragraph]");
+  return paragraph instanceof HTMLParagraphElement ? paragraph : null;
 }
 
 function getParagraphContext(range: Range): string {
