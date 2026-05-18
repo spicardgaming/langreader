@@ -5,10 +5,15 @@ type TranslateRequest = {
   context: string;
 };
 
+type Example = {
+  english: string;
+  russian: string;
+};
+
 type TranslateResponse = {
   translation: string;
   transcription: string;
-  examples: string[];
+  examples: Example[];
 };
 
 function parseJsonFromText(text: string): TranslateResponse {
@@ -22,7 +27,13 @@ function parseJsonFromText(text: string): TranslateResponse {
     typeof parsed.transcription !== "string" ||
     !Array.isArray(parsed.examples) ||
     parsed.examples.length !== 2 ||
-    !parsed.examples.every((e) => typeof e === "string")
+    !parsed.examples.every(
+      (e) =>
+        typeof e === "object" &&
+        e !== null &&
+        typeof (e as Example).english === "string" &&
+        typeof (e as Example).russian === "string",
+    )
   ) {
     throw new Error("Invalid response shape from model");
   }
@@ -62,10 +73,12 @@ Context sentence: "${context}"
 Return ONLY valid JSON (no markdown, no explanation) with exactly these fields:
 - "translation": Russian translation of the word in this context
 - "transcription": IPA phonetic transcription of the English word
-- "examples": array of exactly 2 example sentences in English that use the word naturally
+- "examples": array of exactly 2 objects, each with:
+  - "english": an example sentence in English that uses the word naturally
+  - "russian": Russian translation of that sentence
 
 Example format:
-{"translation":"...","transcription":"...","examples":["...","..."]}`;
+{"translation":"...","transcription":"...","examples":[{"english":"...","russian":"..."},{"english":"...","russian":"..."}]}`;
 
   const anthropicResponse = await fetch(
     "https://api.anthropic.com/v1/messages",

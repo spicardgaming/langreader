@@ -13,10 +13,15 @@ const PARAGRAPHS = [
   "When the sun climbed higher, she closed the book and looked up at the green canopy above. The walk home would be short, but the story would stay with her all day.",
 ];
 
+type Example = {
+  english: string;
+  russian: string;
+};
+
 type TranslateResult = {
   translation: string;
   transcription: string;
-  examples: string[];
+  examples: Example[];
 };
 
 type PopupState = {
@@ -28,18 +33,92 @@ type PopupState = {
   data?: TranslateResult;
 };
 
+const WORD_CHAR = /[a-zA-Z'-]/;
+
 function isSingleWord(text: string): boolean {
   const word = text.trim();
   return word.length > 0 && /^[a-zA-Z'-]+$/.test(word);
 }
 
-function getParagraphContext(range: Range): string {
+function getParagraphFromRange(range: Range): HTMLParagraphElement | null {
   let node: Node | null = range.commonAncestorContainer;
   if (node.nodeType === Node.TEXT_NODE) {
     node = node.parentElement;
   }
-  const paragraph = (node as Element | null)?.closest("p[data-paragraph]");
-  return paragraph?.textContent?.trim() ?? "";
+  return (node as Element | null)?.closest("p[data-paragraph]");
+}
+
+function getParagraphContext(range: Range): string {
+  return getParagraphFromRange(range)?.textContent?.trim() ?? "";
+}
+
+function getOffsetInElement(element: Element, container: Node, offset: number): number {
+  const preRange = document.createRange();
+  preRange.selectNodeContents(element);
+  preRange.setEnd(container, offset);
+  return preRange.toString().length;
+}
+
+function setRangeOffsets(
+  element: Element,
+  start: number,
+  end: number,
+): Range | null {
+  const range = document.createRange();
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  let pos = 0;
+  let startSet = false;
+
+  let textNode: Text | null;
+  while ((textNode = walker.nextNode() as Text | null)) {
+    const nodeEnd = pos + textNode.length;
+
+    if (!startSet && start < nodeEnd) {
+      range.setStart(textNode, start - pos);
+      startSet = true;
+    }
+
+    if (startSet && end <= nodeEnd) {
+      range.setEnd(textNode, end - pos);
+      return range;
+    }
+
+    pos = nodeEnd;
+  }
+
+  return null;
+}
+
+/** Expands range to word boundaries; returns null if not exactly one word. */
+function expandRangeToWholeWord(
+  range: Range,
+  paragraph: Element,
+): Range | null {
+  const text = paragraph.textContent ?? "";
+  if (!text) return null;
+
+  const start = getOffsetInElement(paragraph, range.startContainer, range.startOffset);
+  const end = getOffsetInElement(paragraph, range.endContainer, range.endOffset);
+
+  if (start > end) return null;
+
+  let wordStart = start;
+  while (wordStart > 0 && WORD_CHAR.test(text[wordStart - 1]!)) {
+    wordStart--;
+  }
+
+  let wordEnd = end;
+  while (wordEnd < text.length && WORD_CHAR.test(text[wordEnd]!)) {
+    wordEnd++;
+  }
+
+  const word = text.slice(wordStart, wordEnd);
+  if (!isSingleWord(word)) return null;
+
+  // Selection must touch the same word (not span a gap between words).
+  if (wordStart > end || wordEnd < start) return null;
+
+  return setRangeOffsets(paragraph, wordStart, wordEnd);
 }
 
 export default function Home() {
@@ -70,15 +149,31 @@ export default function Home() {
       return;
     }
 
-    const word = selection.toString();
-    if (!isSingleWord(word)) {
+    const range = selection.getRangeAt(0);
+    const paragraph = getParagraphFromRange(range);
+    if (
+      !paragraph ||
+      !paragraph.contains(range.startContainer) ||
+      !paragraph.contains(range.endContainer)
+    ) {
       return;
     }
 
-    const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    const context = getParagraphContext(range);
-    const normalizedWord = word.trim();
+    const expandedRange = expandRangeToWholeWord(range, paragraph);
+    if (!expandedRange) {
+      return;
+    }
+
+    selection.removeAllRanges();
+    selection.addRange(expandedRange);
+
+    const word = expandedRange.toString().trim();
+    if (!isSingleWord(word)) {
+      return;
+    }
+    const rect = expandedRange.getBoundingClientRect();
+    const context = getParagraphContext(expandedRange);
+    const normalizedWord = word;
 
     skipCloseClickRef.current = true;
     const fetchId = ++fetchIdRef.current;
@@ -192,10 +287,13 @@ export default function Home() {
                 <span className="text-[#8a8580]">Транскрипция: </span>
                 {popup.data.transcription}
               </p>
-              <ul className="space-y-1 border-t border-[#eee] pt-2">
+              <ul className="space-y-2 border-t border-[#eee] pt-2">
                 {popup.data.examples.map((example, i) => (
-                  <li key={i} className="leading-snug text-[#444]">
-                    {example}
+                  <li key={i}>
+                    <p className="leading-snug text-[#444]">{example.english}</p>
+                    <p className="mt-0.5 text-xs leading-snug text-[#8a8580]">
+                      {example.russian}
+                    </p>
                   </li>
                 ))}
               </ul>
