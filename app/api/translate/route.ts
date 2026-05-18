@@ -1,0 +1,117 @@
+import { NextRequest, NextResponse } from "next/server";
+
+type TranslateRequest = {
+  word: string;
+  context: string;
+};
+
+type TranslateResponse = {
+  translation: string;
+  transcription: string;
+  examples: string[];
+};
+
+function parseJsonFromText(text: string): TranslateResponse {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  const jsonText = fenced ? fenced[1].trim() : trimmed;
+  const parsed = JSON.parse(jsonText) as TranslateResponse;
+
+  if (
+    typeof parsed.translation !== "string" ||
+    typeof parsed.transcription !== "string" ||
+    !Array.isArray(parsed.examples) ||
+    parsed.examples.length !== 2 ||
+    !parsed.examples.every((e) => typeof e === "string")
+  ) {
+    throw new Error("Invalid response shape from model");
+  }
+
+  return parsed;
+}
+
+export async function POST(request: NextRequest) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "ANTHROPIC_API_KEY is not configured" },
+      { status: 500 },
+    );
+  }
+
+  let body: TranslateRequest;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { word, context } = body;
+  if (!word || typeof word !== "string") {
+    return NextResponse.json({ error: "word is required" }, { status: 400 });
+  }
+  if (typeof context !== "string") {
+    return NextResponse.json({ error: "context is required" }, { status: 400 });
+  }
+
+  const prompt = `You are helping a Russian speaker learn English vocabulary.
+
+Word: "${word}"
+Context sentence: "${context}"
+
+Return ONLY valid JSON (no markdown, no explanation) with exactly these fields:
+- "translation": Russian translation of the word in this context
+- "transcription": IPA phonetic transcription of the English word
+- "examples": array of exactly 2 example sentences in English that use the word naturally
+
+Example format:
+{"translation":"...","transcription":"...","examples":["...","..."]}`;
+
+  const anthropicResponse = await fetch(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 512,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    },
+  );
+
+  if (!anthropicResponse.ok) {
+    const details = await anthropicResponse.text();
+    return NextResponse.json(
+      { error: "Anthropic API request failed", details },
+      { status: anthropicResponse.status },
+    );
+  }
+
+  const data = (await anthropicResponse.json()) as {
+    content?: { type: string; text?: string }[];
+  };
+
+  const textBlock = data.content?.find((block) => block.type === "text");
+  const text = textBlock?.text;
+  if (!text) {
+    return NextResponse.json(
+      { error: "Empty response from Anthropic API" },
+      { status: 502 },
+    );
+  }
+
+  try {
+    const result = parseJsonFromText(text);
+    return NextResponse.json(result);
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to parse model response", raw: text },
+      { status: 502 },
+    );
+  }
+}
