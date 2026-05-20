@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 type TranslateRequest = {
   word: string;
   context: string;
+  isPhrase?: boolean;
 };
 
 type Example = {
@@ -10,17 +11,25 @@ type Example = {
   russian: string;
 };
 
-type TranslateResponse = {
+type WordTranslateResponse = {
   translation: string;
   transcription: string;
   examples: Example[];
 };
 
-function parseJsonFromText(text: string): TranslateResponse {
+type PhraseTranslateResponse = {
+  translation: string;
+  explanation: string;
+};
+
+function extractJsonText(text: string): string {
   const trimmed = text.trim();
   const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
-  const jsonText = fenced ? fenced[1].trim() : trimmed;
-  const parsed = JSON.parse(jsonText) as TranslateResponse;
+  return fenced ? fenced[1].trim() : trimmed;
+}
+
+function parseWordJsonFromText(text: string): WordTranslateResponse {
+  const parsed = JSON.parse(extractJsonText(text)) as WordTranslateResponse;
 
   if (
     typeof parsed.translation !== "string" ||
@@ -34,6 +43,19 @@ function parseJsonFromText(text: string): TranslateResponse {
         typeof (e as Example).english === "string" &&
         typeof (e as Example).russian === "string",
     )
+  ) {
+    throw new Error("Invalid response shape from model");
+  }
+
+  return parsed;
+}
+
+function parsePhraseJsonFromText(text: string): PhraseTranslateResponse {
+  const parsed = JSON.parse(extractJsonText(text)) as PhraseTranslateResponse;
+
+  if (
+    typeof parsed.translation !== "string" ||
+    typeof parsed.explanation !== "string"
   ) {
     throw new Error("Invalid response shape from model");
   }
@@ -57,7 +79,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { word, context } = body;
+  const { word, context, isPhrase } = body;
   if (!word || typeof word !== "string") {
     return NextResponse.json({ error: "word is required" }, { status: 400 });
   }
@@ -65,7 +87,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "context is required" }, { status: 400 });
   }
 
-  const prompt = `You are helping a Russian speaker learn English vocabulary.
+  const prompt = isPhrase
+    ? `You are helping a Russian speaker learn English.
+
+Phrase: "${word}"
+Context sentence: "${context}"
+
+Return ONLY valid JSON (no markdown, no text outside JSON) with exactly these fields:
+- "translation": Russian translation of the phrase in this context
+- "explanation": brief explanation in Russian of the phrase meaning and usage (1-2 sentences)
+
+Example format:
+{"translation":"...","explanation":"..."}`
+    : `You are helping a Russian speaker learn English vocabulary.
 
 Word: "${word}"
 Context sentence: "${context}"
@@ -119,7 +153,9 @@ Example format:
   }
 
   try {
-    const result = parseJsonFromText(text);
+    const result = isPhrase
+      ? parsePhraseJsonFromText(text)
+      : parseWordJsonFromText(text);
     return NextResponse.json(result);
   } catch {
     return NextResponse.json(

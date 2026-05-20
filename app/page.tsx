@@ -18,19 +18,27 @@ type Example = {
   russian: string;
 };
 
-type TranslateResult = {
+type WordTranslateResult = {
   translation: string;
   transcription: string;
   examples: Example[];
 };
 
+type PhraseTranslateResult = {
+  translation: string;
+  explanation: string;
+};
+
 type PopupState = {
-  word: string;
-  x: number;
-  y: number;
+  text: string;
+  isPhrase: boolean;
+  left: number;
+  top: number;
+  width: number;
   loading: boolean;
   error?: string;
-  data?: TranslateResult;
+  wordData?: WordTranslateResult;
+  phraseData?: PhraseTranslateResult;
 };
 
 const WORD_CHAR = /[a-zA-Z'-]/;
@@ -38,6 +46,19 @@ const WORD_CHAR = /[a-zA-Z'-]/;
 function isSingleWord(text: string): boolean {
   const word = text.trim();
   return word.length > 0 && /^[a-zA-Z'-]+$/.test(word);
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function isValidPhrase(text: string): boolean {
+  const n = countWords(text);
+  return n > 1 && n <= 10;
+}
+
+function isEnglishSelection(text: string): boolean {
+  return /^[a-zA-Z\s'.,!?-]+$/.test(text.trim());
 }
 
 function getParagraphFromRange(range: Range): HTMLParagraphElement | null {
@@ -125,8 +146,39 @@ function expandRangeToWholeWord(
   return setRangeOffsets(paragraph, wordStart, wordEnd);
 }
 
+/** Expands partial first/last words in a multi-word selection to full word boundaries. */
+function expandRangeToPhraseBounds(
+  range: Range,
+  paragraph: Element,
+): Range | null {
+  const text = paragraph.textContent ?? "";
+  if (!text) return null;
+
+  const start = getOffsetInElement(paragraph, range.startContainer, range.startOffset);
+  const end = getOffsetInElement(paragraph, range.endContainer, range.endOffset);
+
+  if (start > end) return null;
+
+  let phraseStart = start;
+  while (phraseStart > 0 && WORD_CHAR.test(text[phraseStart - 1]!)) {
+    phraseStart--;
+  }
+
+  let phraseEnd = end;
+  while (phraseEnd < text.length && WORD_CHAR.test(text[phraseEnd]!)) {
+    phraseEnd++;
+  }
+
+  if (phraseStart === start && phraseEnd === end) {
+    return range;
+  }
+
+  return setRangeOffsets(paragraph, phraseStart, phraseEnd);
+}
+
 export default function Home() {
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const articleRef = useRef<HTMLElement>(null);
   const skipCloseClickRef = useRef(false);
   const fetchIdRef = useRef(0);
 
@@ -163,41 +215,65 @@ export default function Home() {
       return;
     }
 
-    const expandedRange = expandRangeToWholeWord(range, paragraph);
-    if (!expandedRange) {
+    const rawText = range.toString().trim();
+    if (!rawText || !isEnglishSelection(rawText)) {
       return;
     }
 
-    selection.removeAllRanges();
-    selection.addRange(expandedRange);
+    const isPhrase = isValidPhrase(rawText);
+    let activeRange: Range;
 
-    const word = expandedRange.toString().trim();
-    if (!isSingleWord(word)) {
-      return;
+    if (isPhrase) {
+      const expandedRange = expandRangeToPhraseBounds(range, paragraph);
+      if (!expandedRange) {
+        return;
+      }
+      if (expandedRange !== range) {
+        selection.removeAllRanges();
+        selection.addRange(expandedRange);
+      }
+      activeRange = expandedRange;
+    } else {
+      const expandedRange = expandRangeToWholeWord(range, paragraph);
+      if (!expandedRange) {
+        return;
+      }
+      selection.removeAllRanges();
+      selection.addRange(expandedRange);
+      activeRange = expandedRange;
+
+      const word = expandedRange.toString().trim();
+      if (!isSingleWord(word)) {
+        return;
+      }
     }
-    const rect = expandedRange.getBoundingClientRect();
-    const context = getParagraphContext(expandedRange);
-    const normalizedWord = word;
+
+    const text = activeRange.toString().trim();
+    const selectionRect = activeRange.getBoundingClientRect();
+    const articleRect = articleRef.current?.getBoundingClientRect();
+    const context = getParagraphContext(activeRange);
 
     skipCloseClickRef.current = true;
     const fetchId = ++fetchIdRef.current;
 
     setPopup({
-      word: normalizedWord,
-      x: rect.left + rect.width / 2,
-      y: rect.bottom + 8,
+      text,
+      isPhrase,
+      left: articleRect?.left ?? selectionRect.left,
+      top: selectionRect.bottom,
+      width: articleRect?.width ?? 700,
       loading: true,
     });
 
     fetch("/api/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ word: normalizedWord, context }),
+      body: JSON.stringify({ word: text, context, isPhrase }),
     })
       .then(async (res) => {
-        const payload = (await res.json()) as TranslateResult & {
-          error?: string;
-        };
+        const payload = (await res.json()) as
+          | (WordTranslateResult & { error?: string })
+          | (PhraseTranslateResult & { error?: string });
         if (!res.ok) {
           throw new Error(payload.error ?? "Ошибка перевода");
         }
@@ -206,15 +282,21 @@ export default function Home() {
       .then((data) => {
         if (fetchId !== fetchIdRef.current) return;
         setPopup((prev) =>
-          prev?.word === normalizedWord
-            ? { ...prev, loading: false, data }
+          prev?.text === text
+            ? {
+                ...prev,
+                loading: false,
+                ...(isPhrase
+                  ? { phraseData: data as PhraseTranslateResult }
+                  : { wordData: data as WordTranslateResult }),
+              }
             : prev,
         );
       })
       .catch((err: Error) => {
         if (fetchId !== fetchIdRef.current) return;
         setPopup((prev) =>
-          prev?.word === normalizedWord
+          prev?.text === text
             ? {
                 ...prev,
                 loading: false,
@@ -231,7 +313,7 @@ export default function Home() {
       style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
       onMouseUp={handleMouseUp}
     >
-      <article className="mx-auto w-full max-w-[700px]">
+      <article ref={articleRef} className="mx-auto w-full max-w-[700px]">
         <header className="mb-10 border-b border-[#e0ddd6] pb-6">
           <p className="mb-2 text-sm tracking-wide text-[#8a8580] uppercase">
             Читалка
@@ -268,40 +350,62 @@ export default function Home() {
         <div
           role="dialog"
           aria-live="polite"
-          className="fixed z-50 w-[min(320px,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-[#e0ddd6] bg-white px-4 py-3 shadow-lg"
+          className="fixed z-50 rounded-xl px-6 py-5"
           style={{
-            left: popup.x,
-            top: popup.y,
+            left: popup.left,
+            top: popup.top,
+            width: popup.width,
+            marginTop: 8,
             fontFamily: "system-ui, sans-serif",
+            background: "#ffffff",
+            border: "1px solid #e0e0e0",
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
           }}
         >
-          <p className="text-base font-semibold text-[#1a1a1a]">{popup.word}</p>
+          <p className="text-lg font-bold leading-snug text-[#1a1a1a]">
+            {popup.text}
+          </p>
 
           {popup.loading ? (
             <p className="mt-2 text-sm text-[#8a8580]">Загрузка...</p>
           ) : popup.error ? (
             <p className="mt-2 text-sm text-red-600">{popup.error}</p>
-          ) : popup.data ? (
-            <div className="mt-2 space-y-2 text-sm text-[#333]">
-              <p>
-                <span className="text-[#8a8580]">Перевод: </span>
-                {popup.data.translation}
+          ) : popup.isPhrase && popup.phraseData ? (
+            <>
+              <p className="mt-1.5 text-base text-[#1a1a1a]">
+                {popup.phraseData.translation}
               </p>
-              <p>
-                <span className="text-[#8a8580]">Транскрипция: </span>
-                {popup.data.transcription}
+              <div className="mt-3 border-t border-[#e8e6e1] pt-3">
+                <p className="text-sm leading-relaxed text-[#555]">
+                  {popup.phraseData.explanation}
+                </p>
+              </div>
+            </>
+          ) : popup.wordData ? (
+            <>
+              <p className="mt-1.5 text-base text-[#1a1a1a]">
+                {popup.wordData.translation}
               </p>
-              <ul className="space-y-2 border-t border-[#eee] pt-2">
-                {popup.data.examples.map((example, i) => (
-                  <li key={i}>
-                    <p className="leading-snug text-[#444]">{example.english}</p>
-                    <p className="mt-0.5 text-xs leading-snug text-[#8a8580]">
-                      {example.russian}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              {popup.wordData.transcription ? (
+                <p className="mt-1 text-sm italic text-[#8a8580]">
+                  {popup.wordData.transcription}
+                </p>
+              ) : null}
+              {popup.wordData.examples.length > 0 ? (
+                <ul className="mt-3 space-y-3 border-t border-[#e8e6e1] pt-3">
+                  {popup.wordData.examples.map((example, i) => (
+                    <li key={i}>
+                      <p className="text-sm leading-snug text-[#333]">
+                        {example.english}
+                      </p>
+                      <p className="mt-0.5 text-sm leading-snug text-[#8a8580]">
+                        {example.russian}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
           ) : null}
         </div>
       )}
