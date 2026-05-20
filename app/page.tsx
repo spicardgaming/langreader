@@ -36,7 +36,6 @@ type ParagraphTranslateResult = {
 type ParagraphState = {
   open: boolean;
   loading: boolean;
-  translation?: string;
   error?: string;
 };
 
@@ -212,6 +211,9 @@ function expandRangeToPhraseBounds(
 
 export default function Home() {
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const [paragraphTranslationCache, setParagraphTranslationCache] = useState<
+    Record<number, string>
+  >({});
   const [paragraphStates, setParagraphStates] = useState<
     Record<number, ParagraphState>
   >({});
@@ -356,8 +358,8 @@ export default function Home() {
           return { ...prev, [index]: { ...current, open: false } };
         }
 
-        if (current?.translation) {
-          return { ...prev, [index]: { ...current, open: true } };
+        if (paragraphTranslationCache[index]) {
+          return { ...prev, [index]: { open: true, loading: false } };
         }
 
         if (current?.loading) return prev;
@@ -387,13 +389,13 @@ export default function Home() {
         })
         .then((data) => {
           if (paragraphFetchIdRef.current[index] !== fetchId) return;
+          setParagraphTranslationCache((prev) => ({
+            ...prev,
+            [index]: data.paragraphTranslation,
+          }));
           setParagraphStates((prev) => ({
             ...prev,
-            [index]: {
-              open: true,
-              loading: false,
-              translation: data.paragraphTranslation,
-            },
+            [index]: { open: true, loading: false },
           }));
         })
         .catch((err: Error) => {
@@ -408,7 +410,7 @@ export default function Home() {
           }));
         });
     },
-    [],
+    [paragraphTranslationCache],
   );
 
   return (
@@ -474,14 +476,14 @@ export default function Home() {
                   {isOpen && pState?.error ? (
                     <p className="mt-3 text-sm text-red-600">{pState.error}</p>
                   ) : null}
-                  {isOpen && pState?.translation ? (
+                  {isOpen && paragraphTranslationCache[index] ? (
                     <div
                       className="mt-3 rounded-md bg-[#f0eeea] px-4 py-3 text-base leading-[1.7] text-[#444]"
                       style={{
                         fontFamily: "system-ui, sans-serif",
                       }}
                     >
-                      {pState.translation}
+                      {paragraphTranslationCache[index]}
                     </div>
                   ) : null}
                 </div>
