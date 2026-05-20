@@ -29,6 +29,17 @@ type PhraseTranslateResult = {
   explanation: string;
 };
 
+type ParagraphTranslateResult = {
+  paragraphTranslation: string;
+};
+
+type ParagraphState = {
+  open: boolean;
+  loading: boolean;
+  translation?: string;
+  error?: string;
+};
+
 type PopupState = {
   text: string;
   isPhrase: boolean;
@@ -59,6 +70,29 @@ function isValidPhrase(text: string): boolean {
 
 function isEnglishSelection(text: string): boolean {
   return /^[a-zA-Z\s'.,!?-]+$/.test(text.trim());
+}
+
+function ChevronIcon({ up }: { up: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {up ? (
+        <path d="M18 15l-6-6-6 6" />
+      ) : (
+        <path d="M6 9l6 6 6-6" />
+      )}
+    </svg>
+  );
 }
 
 function getParagraphFromRange(range: Range): HTMLParagraphElement | null {
@@ -178,9 +212,13 @@ function expandRangeToPhraseBounds(
 
 export default function Home() {
   const [popup, setPopup] = useState<PopupState | null>(null);
+  const [paragraphStates, setParagraphStates] = useState<
+    Record<number, ParagraphState>
+  >({});
   const articleRef = useRef<HTMLElement>(null);
   const skipCloseClickRef = useRef(false);
   const fetchIdRef = useRef(0);
+  const paragraphFetchIdRef = useRef<Record<number, number>>({});
 
   const closePopup = useCallback(() => {
     setPopup(null);
@@ -307,6 +345,72 @@ export default function Home() {
       });
   }, []);
 
+  const toggleParagraphTranslation = useCallback(
+    (index: number, text: string) => {
+      let shouldFetch = false;
+
+      setParagraphStates((prev) => {
+        const current = prev[index];
+
+        if (current?.open) {
+          return { ...prev, [index]: { ...current, open: false } };
+        }
+
+        if (current?.translation) {
+          return { ...prev, [index]: { ...current, open: true } };
+        }
+
+        if (current?.loading) return prev;
+
+        shouldFetch = true;
+        return { ...prev, [index]: { open: true, loading: true } };
+      });
+
+      if (!shouldFetch) return;
+
+      const fetchId = (paragraphFetchIdRef.current[index] ?? 0) + 1;
+      paragraphFetchIdRef.current[index] = fetchId;
+
+      fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: text, context: text, isParagraph: true }),
+      })
+        .then(async (res) => {
+          const payload = (await res.json()) as ParagraphTranslateResult & {
+            error?: string;
+          };
+          if (!res.ok) {
+            throw new Error(payload.error ?? "Ошибка перевода");
+          }
+          return payload;
+        })
+        .then((data) => {
+          if (paragraphFetchIdRef.current[index] !== fetchId) return;
+          setParagraphStates((prev) => ({
+            ...prev,
+            [index]: {
+              open: true,
+              loading: false,
+              translation: data.paragraphTranslation,
+            },
+          }));
+        })
+        .catch((err: Error) => {
+          if (paragraphFetchIdRef.current[index] !== fetchId) return;
+          setParagraphStates((prev) => ({
+            ...prev,
+            [index]: {
+              open: true,
+              loading: false,
+              error: err.message || "Не удалось загрузить перевод",
+            },
+          }));
+        });
+    },
+    [],
+  );
+
   return (
     <div
       className="min-h-full bg-[#f7f5f0] py-12 px-4 text-[#2c2c2c]"
@@ -324,25 +428,66 @@ export default function Home() {
         </header>
 
         <div className="space-y-6">
-          {PARAGRAPHS.map((text, index) => (
-            <div
-              key={index}
-              className="flex gap-4 rounded-lg bg-white/70 px-5 py-4 shadow-sm"
-            >
-              <span
-                className="shrink-0 pt-0.5 text-sm tabular-nums text-[#a8a29e] select-none"
-                aria-hidden
+          {PARAGRAPHS.map((text, index) => {
+            const pState = paragraphStates[index];
+            const isOpen = pState?.open ?? false;
+
+            return (
+              <div
+                key={index}
+                className="flex gap-4 rounded-lg bg-white/70 px-5 py-4 shadow-sm"
               >
-                {index + 1}
-              </span>
-              <p
-                data-paragraph
-                className="text-lg leading-[1.75] text-[#333]"
-              >
-                {text}
-              </p>
-            </div>
-          ))}
+                <span
+                  className="shrink-0 pt-0.5 text-sm tabular-nums text-[#a8a29e] select-none"
+                  aria-hidden
+                >
+                  {index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start gap-2">
+                    <p
+                      data-paragraph
+                      className="min-w-0 flex-1 text-lg leading-[1.75] text-[#333]"
+                    >
+                      {text}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleParagraphTranslation(index, text);
+                      }}
+                      className="mt-1 shrink-0 rounded p-1 text-[#a8a29e] transition-colors hover:bg-[#f0eeea] hover:text-[#78716c]"
+                      aria-label={
+                        isOpen ? "Свернуть перевод" : "Перевести абзац"
+                      }
+                      aria-expanded={isOpen}
+                    >
+                      <ChevronIcon up={isOpen} />
+                    </button>
+                  </div>
+                  {isOpen && pState?.loading ? (
+                    <p className="mt-3 text-sm text-[#8a8580]">
+                      Загрузка перевода...
+                    </p>
+                  ) : null}
+                  {isOpen && pState?.error ? (
+                    <p className="mt-3 text-sm text-red-600">{pState.error}</p>
+                  ) : null}
+                  {isOpen && pState?.translation ? (
+                    <div
+                      className="mt-3 rounded-md bg-[#f0eeea] px-4 py-3 text-base leading-[1.7] text-[#444]"
+                      style={{
+                        fontFamily: "system-ui, sans-serif",
+                      }}
+                    >
+                      {pState.translation}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </article>
 

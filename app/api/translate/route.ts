@@ -4,6 +4,7 @@ type TranslateRequest = {
   word: string;
   context: string;
   isPhrase?: boolean;
+  isParagraph?: boolean;
 };
 
 type Example = {
@@ -20,6 +21,10 @@ type WordTranslateResponse = {
 type PhraseTranslateResponse = {
   translation: string;
   explanation: string;
+};
+
+type ParagraphTranslateResponse = {
+  paragraphTranslation: string;
 };
 
 function extractJsonText(text: string): string {
@@ -63,6 +68,16 @@ function parsePhraseJsonFromText(text: string): PhraseTranslateResponse {
   return parsed;
 }
 
+function parseParagraphJsonFromText(text: string): ParagraphTranslateResponse {
+  const parsed = JSON.parse(extractJsonText(text)) as ParagraphTranslateResponse;
+
+  if (typeof parsed.paragraphTranslation !== "string") {
+    throw new Error("Invalid response shape from model");
+  }
+
+  return parsed;
+}
+
 export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -79,15 +94,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { word, context, isPhrase } = body;
+  const { word, context, isPhrase, isParagraph } = body;
   if (!word || typeof word !== "string") {
     return NextResponse.json({ error: "word is required" }, { status: 400 });
   }
-  if (typeof context !== "string") {
+  if (!isParagraph && typeof context !== "string") {
     return NextResponse.json({ error: "context is required" }, { status: 400 });
   }
 
-  const prompt = isPhrase
+  const prompt = isParagraph
+    ? `You are helping a Russian speaker learn English.
+
+Translate the following English paragraph into Russian completely. Do not shorten, summarize, or omit any part of the text.
+
+Paragraph:
+"${word}"
+
+Return ONLY valid JSON (no markdown, no text outside JSON) with exactly this field:
+- "paragraphTranslation": the full Russian translation of the entire paragraph
+
+Example format:
+{"paragraphTranslation":"..."}`
+    : isPhrase
     ? `You are helping a Russian speaker learn English.
 
 Phrase: "${word}"
@@ -125,7 +153,7 @@ Example format:
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 512,
+        max_tokens: isParagraph ? 1024 : 512,
         messages: [{ role: "user", content: prompt }],
       }),
     },
@@ -153,9 +181,11 @@ Example format:
   }
 
   try {
-    const result = isPhrase
-      ? parsePhraseJsonFromText(text)
-      : parseWordJsonFromText(text);
+    const result = isParagraph
+      ? parseParagraphJsonFromText(text)
+      : isPhrase
+        ? parsePhraseJsonFromText(text)
+        : parseWordJsonFromText(text);
     return NextResponse.json(result);
   } catch {
     return NextResponse.json(
