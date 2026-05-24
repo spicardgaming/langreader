@@ -221,6 +221,8 @@ export default function Home() {
   const skipCloseClickRef = useRef(false);
   const fetchIdRef = useRef(0);
   const paragraphFetchIdRef = useRef<Record<number, number>>({});
+  const paragraphTranslationCacheRef = useRef(paragraphTranslationCache);
+  paragraphTranslationCacheRef.current = paragraphTranslationCache;
 
   const closePopup = useCallback(() => {
     setPopup(null);
@@ -349,20 +351,19 @@ export default function Home() {
 
   const toggleParagraphTranslation = useCallback(
     (index: number, text: string) => {
+      const cached = paragraphTranslationCacheRef.current[index];
       let shouldFetch = false;
 
       setParagraphStates((prev) => {
-        const current = prev[index];
+        const isOpen = prev[index]?.open ?? false;
 
-        if (current?.open) {
-          return { ...prev, [index]: { ...current, open: false } };
+        if (isOpen) {
+          return { ...prev, [index]: { open: false, loading: false } };
         }
 
-        if (paragraphTranslationCache[index]) {
+        if (cached !== undefined) {
           return { ...prev, [index]: { open: true, loading: false } };
         }
-
-        if (current?.loading) return prev;
 
         shouldFetch = true;
         return { ...prev, [index]: { open: true, loading: true } };
@@ -389,28 +390,44 @@ export default function Home() {
         })
         .then((data) => {
           if (paragraphFetchIdRef.current[index] !== fetchId) return;
+
+          const translation = data.paragraphTranslation;
+          paragraphTranslationCacheRef.current = {
+            ...paragraphTranslationCacheRef.current,
+            [index]: translation,
+          };
           setParagraphTranslationCache((prev) => ({
             ...prev,
-            [index]: data.paragraphTranslation,
+            [index]: translation,
           }));
-          setParagraphStates((prev) => ({
-            ...prev,
-            [index]: { open: true, loading: false },
-          }));
+          setParagraphStates((prev) => {
+            if (!prev[index]?.open) {
+              return { ...prev, [index]: { open: false, loading: false } };
+            }
+            return {
+              ...prev,
+              [index]: { open: true, loading: false },
+            };
+          });
         })
         .catch((err: Error) => {
           if (paragraphFetchIdRef.current[index] !== fetchId) return;
-          setParagraphStates((prev) => ({
-            ...prev,
-            [index]: {
-              open: true,
-              loading: false,
-              error: err.message || "Не удалось загрузить перевод",
-            },
-          }));
+          setParagraphStates((prev) => {
+            if (!prev[index]?.open) {
+              return { ...prev, [index]: { open: false, loading: false } };
+            }
+            return {
+              ...prev,
+              [index]: {
+                open: true,
+                loading: false,
+                error: err.message || "Не удалось загрузить перевод",
+              },
+            };
+          });
         });
     },
-    [paragraphTranslationCache],
+    [],
   );
 
   return (
@@ -476,7 +493,8 @@ export default function Home() {
                   {isOpen && pState?.error ? (
                     <p className="mt-3 text-sm text-red-600">{pState.error}</p>
                   ) : null}
-                  {isOpen && paragraphTranslationCache[index] ? (
+                  {isOpen &&
+                  paragraphTranslationCache[index] !== undefined ? (
                     <div
                       className="mt-3 rounded-md bg-[#f0eeea] px-4 py-3 text-base leading-[1.7] text-[#444]"
                       style={{
