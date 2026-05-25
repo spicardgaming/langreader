@@ -12,10 +12,22 @@ type Example = {
   russian: string;
 };
 
+type VerbFormEntry = {
+  name: string;
+  form: string;
+};
+
+type VerbForms = {
+  tense: string;
+  forms: VerbFormEntry[];
+};
+
 type WordTranslateResponse = {
   translation: string;
   transcription: string;
   examples: Example[];
+  isVerb: boolean;
+  verbForms: VerbForms | null;
 };
 
 type PhraseTranslateResponse = {
@@ -33,6 +45,24 @@ function extractJsonText(text: string): string {
   return fenced ? fenced[1].trim() : trimmed;
 }
 
+function isValidVerbForms(value: unknown): value is VerbForms {
+  if (typeof value !== "object" || value === null) return false;
+  const vf = value as VerbForms;
+  return (
+    typeof vf.tense === "string" &&
+    vf.tense.length > 0 &&
+    Array.isArray(vf.forms) &&
+    vf.forms.length > 0 &&
+    vf.forms.every(
+      (f) =>
+        typeof f === "object" &&
+        f !== null &&
+        typeof f.name === "string" &&
+        typeof f.form === "string",
+    )
+  );
+}
+
 function parseWordJsonFromText(text: string): WordTranslateResponse {
   const parsed = JSON.parse(extractJsonText(text)) as WordTranslateResponse;
 
@@ -47,7 +77,12 @@ function parseWordJsonFromText(text: string): WordTranslateResponse {
         e !== null &&
         typeof (e as Example).english === "string" &&
         typeof (e as Example).russian === "string",
-    )
+    ) ||
+    typeof parsed.isVerb !== "boolean" ||
+    (parsed.isVerb && !isValidVerbForms(parsed.verbForms)) ||
+    (!parsed.isVerb &&
+      parsed.verbForms !== null &&
+      parsed.verbForms !== undefined)
   ) {
     throw new Error("Invalid response shape from model");
   }
@@ -132,15 +167,29 @@ Example format:
 Word: "${word}"
 Context sentence: "${context}"
 
+First determine whether the word is used as a verb in this context sentence.
+If it is a verb, identify which English tense it is used in within that context.
+
 Return ONLY valid JSON (no markdown, no explanation) with exactly these fields:
 - "translation": Russian translation of the word in this context
 - "transcription": IPA phonetic transcription of the English word
 - "examples": array of exactly 2 objects, each with:
   - "english": an example sentence in English that uses the word naturally
   - "russian": Russian translation of that sentence
+- "isVerb": boolean — true if the word is a verb in this context
+- "verbForms": if isVerb is true, an object with:
+  - "tense": name of the tense as used in the context (in English, e.g. "Present Simple", "Past Simple", "Present Continuous")
+  - "forms": array of ALL conjugation forms for that tense only of the verb's lemma (infinitive), each object with:
+    - "name": English label for the grammatical form (e.g. "I", "You", "He/She/It", "We", "They", or "I form", "He/She/It form" when clearer for the tense)
+    - "form": the English verb form
+  Keep "translation", "examples[].russian", and all other learner-facing explanations in Russian. Only "tense" and form "name" labels are in English.
+  If isVerb is false, set "verbForms" to null
 
-Example format:
-{"translation":"...","transcription":"...","examples":[{"english":"...","russian":"..."},{"english":"...","russian":"..."}]}`;
+Example format (non-verb):
+{"translation":"...","transcription":"...","examples":[...],"isVerb":false,"verbForms":null}
+
+Example format (verb):
+{"translation":"...","transcription":"...","examples":[...],"isVerb":true,"verbForms":{"tense":"Past Simple","forms":[{"name":"I","form":"walked"},{"name":"He/She/It","form":"walked"}]}}`;
 
   const anthropicResponse = await fetch(
     "https://api.anthropic.com/v1/messages",
@@ -153,7 +202,7 @@ Example format:
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: isParagraph ? 1024 : 512,
+        max_tokens: isParagraph ? 1024 : isPhrase ? 512 : 768,
         messages: [{ role: "user", content: prompt }],
       }),
     },
