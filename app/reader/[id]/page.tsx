@@ -1,14 +1,13 @@
 "use client";
 
 import {
+  use,
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
-
-const TITLE = "The Morning Walk";
 
 const PARAGRAPHS = [
   "On a quiet Sunday morning, Emma left her small apartment and walked toward the park. The streets were still empty, and the air smelled faintly of rain from the night before.",
@@ -18,6 +17,13 @@ const PARAGRAPHS = [
   "Time moved differently when she read. The distant sound of bicycles and children playing became a soft background, like music she did not need to follow.",
   "When the sun climbed higher, she closed the book and looked up at the green canopy above. The walk home would be short, but the story would stay with her all day.",
 ];
+
+const BOOKS: Record<string, { title: string; paragraphs: string[] }> = {
+  "morning-walk": {
+    title: "The Morning Walk",
+    paragraphs: PARAGRAPHS,
+  },
+};
 
 type Example = {
   english: string;
@@ -299,7 +305,14 @@ function expandRangeToPhraseBounds(
   return setRangeOffsets(paragraph, phraseStart, phraseEnd);
 }
 
-export default function Home() {
+export default function ReaderPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const book = BOOKS[id];
+
   const [popup, setPopup] = useState<PopupState | null>(null);
   const [paragraphTranslationCache, setParagraphTranslationCache] = useState<
     Record<string, string>
@@ -616,6 +629,19 @@ export default function Home() {
     [paragraphTranslationCache, paragraphStates],
   );
 
+  if (!book) {
+    return (
+      <div
+        className="flex min-h-full items-center justify-center bg-[#f7f5f0] px-4 py-12 text-[#2c2c2c]"
+        style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+      >
+        <p className="text-lg text-[#57534e]">Книга не найдена</p>
+      </div>
+    );
+  }
+
+  const { title: bookTitle, paragraphs: bookParagraphs } = book;
+
   return (
     <div
       ref={pageRef}
@@ -629,12 +655,12 @@ export default function Home() {
             Читалка
           </p>
           <h1 className="text-3xl font-normal leading-tight text-[#1a1a1a]">
-            {TITLE}
+            {bookTitle}
           </h1>
         </header>
 
         <div className="space-y-6">
-          {PARAGRAPHS.map((text, index) => {
+          {bookParagraphs.map((text, index) => {
             const cacheKey = getParagraphCacheKey(text);
             const pState = paragraphStates[index];
             const isOpen = pState?.open ?? false;

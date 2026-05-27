@@ -1,25 +1,36 @@
+"use client";
+
 import Link from "next/link";
 
 const PRACTICE_BOOKS = [
   {
+    id: "morning-walk",
     title: "The Morning Walk",
     author: "Sample Author",
     level: "Easy" as const,
     genre: "Short story",
+    available: true,
   },
   {
+    id: "letters-from-abroad",
     title: "Letters from Abroad",
     author: "Jane Cooper",
     level: "Advanced" as const,
     genre: "Non-fiction",
+    available: false,
   },
   {
+    id: "room-with-a-view",
     title: "A Room with a View",
     author: "E. M. Forster",
     level: "Advanced" as const,
     genre: "Classic novel",
+    available: false,
   },
 ];
+
+const bookCardClassName =
+  "block w-full cursor-pointer rounded-lg border border-[#e7e5e4] bg-white p-4 text-left no-underline transition-shadow hover:shadow-md";
 
 function ArrowIcon() {
   return (
@@ -89,30 +100,60 @@ export default function Home() {
               Книги для практики
             </h2>
             <div className="grid gap-4 sm:grid-cols-3">
-              {PRACTICE_BOOKS.map((book) => (
-                <Link
-                  key={book.title}
-                  href="#"
-                  className="block rounded-lg border border-[#e7e5e4] bg-white p-4 no-underline transition-shadow hover:shadow-md"
-                >
-                  <h3 className="text-base font-medium leading-snug text-[#1a1a1a]">
-                    {book.title}
-                  </h3>
-                  <p className="mt-1 text-sm text-[#78716c]">{book.author}</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded px-2 py-0.5 text-xs font-medium ${
-                        book.level === "Easy"
-                          ? "bg-[#ecfdf5] text-[#047857]"
-                          : "bg-[#fef3c7] text-[#b45309]"
-                      }`}
-                    >
-                      {book.level}
-                    </span>
-                    <span className="text-xs text-[#a8a29e]">{book.genre}</span>
-                  </div>
-                </Link>
-              ))}
+              {PRACTICE_BOOKS.map((book) =>
+                book.available ? (
+                  <Link
+                    key={book.id}
+                    href={`/reader/${book.id}`}
+                    className={bookCardClassName}
+                  >
+                    <h3 className="text-base font-medium leading-snug text-[#1a1a1a]">
+                      {book.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-[#78716c]">{book.author}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs font-medium ${
+                          book.level === "Easy"
+                            ? "bg-[#ecfdf5] text-[#047857]"
+                            : "bg-[#fef3c7] text-[#b45309]"
+                        }`}
+                      >
+                        {book.level}
+                      </span>
+                      <span className="text-xs text-[#a8a29e]">
+                        {book.genre}
+                      </span>
+                    </div>
+                  </Link>
+                ) : (
+                  <button
+                    key={book.id}
+                    type="button"
+                    onClick={() => alert("Скоро появится")}
+                    className={bookCardClassName}
+                  >
+                    <h3 className="text-base font-medium leading-snug text-[#1a1a1a]">
+                      {book.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-[#78716c]">{book.author}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs font-medium ${
+                          book.level === "Easy"
+                            ? "bg-[#ecfdf5] text-[#047857]"
+                            : "bg-[#fef3c7] text-[#b45309]"
+                        }`}
+                      >
+                        {book.level}
+                      </span>
+                      <span className="text-xs text-[#a8a29e]">
+                        {book.genre}
+                      </span>
+                    </div>
+                  </button>
+                ),
+              )}
             </div>
           </section>
 
