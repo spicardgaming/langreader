@@ -18,9 +18,10 @@ const PARAGRAPHS = [
   "When the sun climbed higher, she closed the book and looked up at the green canopy above. The walk home would be short, but the story would stay with her all day.",
 ];
 
-const BOOKS: Record<string, { title: string; paragraphs: string[] }> = {
+const BOOKS: Record<string, { title: string; author: string; paragraphs: string[] }> = {
   "morning-walk": {
     title: "The Morning Walk",
+    author: "Sample Author",
     paragraphs: PARAGRAPHS,
   },
 };
@@ -642,6 +643,15 @@ export default function ReaderPage({
 
   const { title: bookTitle, paragraphs: bookParagraphs } = book;
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Book',
+    name: book.title,
+    author: { '@type': 'Person', name: book.author },
+    inLanguage: 'en',
+    abstract: book.paragraphs[0].slice(0, 150),
+  }
+
   return (
     <div
       ref={pageRef}
@@ -649,6 +659,7 @@ export default function ReaderPage({
       style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
       onMouseUp={handleMouseUp}
     >
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <article ref={articleRef} className="mx-auto w-full max-w-[700px]">
         <header className="mb-10 border-b border-[#e0ddd6] pb-6">
           <p className="mb-2 text-sm tracking-wide text-[#8a8580] uppercase">
