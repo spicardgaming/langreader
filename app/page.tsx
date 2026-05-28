@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 const PRACTICE_BOOKS = [
   {
@@ -53,6 +55,19 @@ function ArrowIcon() {
 }
 
 export default function Home() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkSession() {
+      const { data } = await supabase.auth.getSession();
+      setIsAuthenticated(!!data.session);
+      setLoading(false);
+    }
+
+    checkSession();
+  }, []);
+
   return (
     <div className="min-h-full bg-[#fafaf9] text-[#2c2c2c]">
       <div className="mx-auto flex min-h-full w-full max-w-[900px] flex-col px-4 py-8 sm:px-6">
@@ -61,14 +76,16 @@ export default function Home() {
             href="/"
             className="text-xl font-semibold tracking-tight text-[#1a1a1a] no-underline"
           >
-            LangReader
+            Balaka
           </Link>
-          <Link
-            href="/auth"
-            className="rounded-md border border-[#d6d3d1] bg-white px-4 py-2 text-sm text-[#444] transition-colors hover:border-[#a8a29e] hover:text-[#1a1a1a]"
-          >
-            Войти
-          </Link>
+          {!loading && (
+            <Link
+              href={isAuthenticated ? "/account" : "/auth"}
+              className="rounded-md border border-[#d6d3d1] bg-white px-4 py-2 text-sm text-[#444] transition-colors hover:border-[#a8a29e] hover:text-[#1a1a1a]"
+            >
+              {isAuthenticated ? "Мой кабинет" : "Войти"}
+            </Link>
+          )}
         </header>
 
         <main className="flex-1">
@@ -159,7 +176,7 @@ export default function Home() {
 
           <section className="mb-16">
             <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">
-              LangReader помогает изучать иностранный язык через чтение книг на
+              Balaka помогает изучать иностранный язык через чтение книг на
               оригинале. Выделяйте незнакомые слова и фразы — сервис мгновенно
               покажет перевод и пояснение в контексте. Загружайте свои тексты
               или начните с готовых материалов для практики.

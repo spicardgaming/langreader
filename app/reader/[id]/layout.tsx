@@ -5,7 +5,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const book = BOOKS[id]
   if (!book) return {}
   return {
-    title: `${book.title} Читать Онлайн на ${BOOK_LANGUAGE} — LangReader`,
+    title: `${book.title} Читать Онлайн на ${BOOK_LANGUAGE} — Balaka`,
     description: `Читайте "${book.title}" (${book.author}) на ${BOOK_LANGUAGE} языке с мгновенным переводом слов и фраз.`,
   }
 }

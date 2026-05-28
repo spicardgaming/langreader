@@ -9,6 +9,7 @@ type Tab = "signin" | "signup";
 export default function AuthPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("signin");
+  const [showResetForm, setShowResetForm] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -17,8 +18,25 @@ export default function AuthPage() {
 
   function switchTab(next: Tab) {
     setTab(next);
+    setShowResetForm(false);
     setError(null);
     setSuccess(null);
+    setEmail("");
+    setPassword("");
+  }
+
+  function showResetPassword() {
+    setShowResetForm(true);
+    setError(null);
+    setSuccess(null);
+    setEmail("");
+  }
+
+  function backToSignIn() {
+    setShowResetForm(false);
+    setError(null);
+    setSuccess(null);
+    setEmail("");
   }
 
   async function handleSignIn(e: React.FormEvent) {
@@ -72,6 +90,29 @@ export default function AuthPage() {
     );
   }
 
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email,
+      {
+        redirectTo: window.location.origin + "/account/reset-password",
+      }
+    );
+
+    setLoading(false);
+
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+
+    setSuccess("Ссылка отправлена, проверьте почту");
+  }
+
   const inputClass =
     "w-full rounded-md border border-[#e0ddd6] bg-white px-4 py-2.5 text-[#2c2c2c] outline-none transition-colors placeholder:text-[#a8a29e] focus:border-[#8a8580]";
 
@@ -79,7 +120,7 @@ export default function AuthPage() {
     <main className="flex min-h-full flex-1 items-center justify-center bg-[#f7f5f0] px-4 py-12 text-[#2c2c2c]">
       <div className="w-full max-w-[400px] rounded-lg bg-white/70 px-8 py-8 shadow-sm">
         <h1 className="mb-6 text-center text-2xl font-normal text-[#1a1a1a]">
-          LangReader
+          Balaka
         </h1>
 
         <div className="mb-6 flex border-b border-[#e0ddd6]">
@@ -108,51 +149,99 @@ export default function AuthPage() {
         </div>
 
         {tab === "signin" ? (
-          <form onSubmit={handleSignIn} className="space-y-4">
-            <div>
-              <label
-                htmlFor="signin-email"
-                className="mb-1.5 block text-sm text-[#8a8580]"
+          showResetForm ? (
+            <div className="space-y-4">
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="reset-email"
+                    className="mb-1.5 block text-sm text-[#8a8580]"
+                  >
+                    Email
+                  </label>
+                  <input
+                    id="reset-email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={inputClass}
+                    placeholder="you@example.com"
+                  />
+                </div>
+                {error && <p className="text-sm text-red-600">{error}</p>}
+                {success && <p className="text-sm text-green-600">{success}</p>}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-md bg-[#2c2c2c] px-4 py-2.5 text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {loading ? "Загрузка..." : "Отправить ссылку"}
+                </button>
+              </form>
+              <button
+                type="button"
+                onClick={backToSignIn}
+                className="w-full text-center text-sm text-[#8a8580] hover:text-[#555]"
               >
-                Email
-              </label>
-              <input
-                id="signin-email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputClass}
-                placeholder="you@example.com"
-              />
+                Назад
+              </button>
             </div>
-            <div>
-              <label
-                htmlFor="signin-password"
-                className="mb-1.5 block text-sm text-[#8a8580]"
+          ) : (
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="signin-email"
+                  className="mb-1.5 block text-sm text-[#8a8580]"
+                >
+                  Email
+                </label>
+                <input
+                  id="signin-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                  placeholder="you@example.com"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="signin-password"
+                  className="mb-1.5 block text-sm text-[#8a8580]"
+                >
+                  Пароль
+                </label>
+                <input
+                  id="signin-password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-md bg-[#2c2c2c] px-4 py-2.5 text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                Пароль
-              </label>
-              <input
-                id="signin-password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-[#2c2c2c] px-4 py-2.5 text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {loading ? "Загрузка..." : "Войти"}
-            </button>
-          </form>
+                {loading ? "Загрузка..." : "Войти"}
+              </button>
+              <button
+                type="button"
+                onClick={showResetPassword}
+                className="w-full text-center text-xs text-[#8a8580] hover:text-[#555] hover:underline"
+              >
+                Забыли пароль?
+              </button>
+            </form>
+          )
         ) : (
           <form onSubmit={handleSignUp} className="space-y-4">
             <div>
