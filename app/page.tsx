@@ -1,8 +1,5 @@
 "use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 
 const PRACTICE_BOOKS = [
   {
@@ -55,40 +52,8 @@ function ArrowIcon() {
 }
 
 export default function Home() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function checkSession() {
-      const { data } = await supabase.auth.getSession();
-      setIsAuthenticated(!!data.session);
-      setLoading(false);
-    }
-
-    checkSession();
-  }, []);
-
   return (
-    <div className="min-h-full bg-[#fafaf9] text-[#2c2c2c]">
-      <div className="mx-auto flex min-h-full w-full max-w-[900px] flex-col px-4 py-8 sm:px-6">
-        <header className="mb-12 flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-xl font-semibold tracking-tight text-[#1a1a1a] no-underline"
-          >
-            Balaka
-          </Link>
-          {!loading && (
-            <Link
-              href={isAuthenticated ? "/account" : "/auth"}
-              className="rounded-md border border-[#d6d3d1] bg-white px-4 py-2 text-sm text-[#444] transition-colors hover:border-[#a8a29e] hover:text-[#1a1a1a]"
-            >
-              {isAuthenticated ? "Мой кабинет" : "Войти"}
-            </Link>
-          )}
-        </header>
-
-        <main className="flex-1">
+    <>
           <section className="mb-14">
             <div className="flex items-stretch gap-3">
               <div
@@ -182,50 +147,6 @@ export default function Home() {
               или начните с готовых материалов для практики.
             </p>
           </section>
-        </main>
-
-        <footer className="border-t border-[#e7e5e4] pt-8 pb-4">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="mb-2 text-sm text-[#78716c]">Поделиться:</p>
-              <div className="flex gap-4 text-sm">
-                <a
-                  href="#"
-                  className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
-                >
-                  Facebook
-                </a>
-                <a
-                  href="#"
-                  className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
-                >
-                  Twitter
-                </a>
-              </div>
-            </div>
-            <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-              <a
-                href="#"
-                className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
-              >
-                About us
-              </a>
-              <a
-                href="#"
-                className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
-              >
-                Contacts
-              </a>
-              <a
-                href="#"
-                className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
-              >
-                Your feedback
-              </a>
-            </nav>
-          </div>
-        </footer>
-      </div>
-    </div>
+    </>
   );
 }

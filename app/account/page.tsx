@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 export default function AccountPage() {
@@ -26,38 +25,16 @@ export default function AccountPage() {
     checkSession();
   }, [router]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push("/");
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#fafaf9] flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <p className="text-[#57534e]">Загрузка...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#fafaf9] text-[#2c2c2c]">
-      <div className="mx-auto flex min-h-full w-full max-w-[900px] flex-col px-4 py-8 sm:px-6">
-        <header className="mb-12 flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-xl font-semibold tracking-tight text-[#1a1a1a] no-underline"
-          >
-            Balaka
-          </Link>
-          <button
-            onClick={handleSignOut}
-            className="rounded-md border border-[#d6d3d1] bg-white px-4 py-2 text-sm text-[#444] transition-colors hover:border-[#a8a29e] hover:text-[#1a1a1a]"
-          >
-            Выйти
-          </button>
-        </header>
-
-        <main className="flex-1">
+    <>
           <h1 className="mb-6 text-2xl font-semibold text-[#1a1a1a]">
             Мой кабинет
           </h1>
@@ -84,8 +61,6 @@ export default function AccountPage() {
               <p className="text-sm text-[#78716c]">Пока ничего нет</p>
             </div>
           </section>
-        </main>
-      </div>
-    </div>
+    </>
   );
 }
