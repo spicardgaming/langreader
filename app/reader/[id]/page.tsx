@@ -646,9 +646,7 @@ export default function ReaderPage({
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <article ref={articleRef} className="mx-auto w-full max-w-[700px]">
         <header className="mb-10 border-b border-[#e0ddd6] pb-6">
-          <p className="mb-2 text-sm tracking-wide text-[#8a8580] uppercase">
-            Читалка
-          </p>
+    
           <h1 className="text-3xl font-normal leading-tight text-[#1a1a1a]">
             {bookTitle}
           </h1>
