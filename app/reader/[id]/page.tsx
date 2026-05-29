@@ -8,7 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import { BOOKS } from "@/lib/books";
+import { supabase } from "@/lib/supabase";
 
 type Example = {
   english: string;
@@ -58,6 +60,8 @@ type PopupState = {
   error?: string;
   wordData?: WordTranslateResult;
   phraseData?: PhraseTranslateResult;
+  saveStatus?: "idle" | "saving" | "saved" | "already_saved" | "error";
+  saveMessage?: string;
 };
 
 type PopupPlacement = {
@@ -297,6 +301,7 @@ export default function ReaderPage({
 }) {
   const { id } = use(params);
   const book = BOOKS[id];
+  const router = useRouter();
 
   const [popup, setPopup] = useState<PopupState | null>(null);
   const [paragraphTranslationCache, setParagraphTranslationCache] = useState<
@@ -314,6 +319,89 @@ export default function ReaderPage({
   const skipCloseClickRef = useRef(false);
   const fetchIdRef = useRef(0);
   const paragraphFetchIdRef = useRef<Record<number, number>>({});
+
+  const handleSaveCard = useCallback(async () => {
+    console.log("handleSaveCard called", { popup });
+    if (!popup) return;
+
+    setPopup((prev) => (prev ? { ...prev, saveStatus: "saving" } : prev));
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("Session check result:", { session, popup });
+
+      if (!session) {
+        router.push("/auth");
+        return;
+      }
+
+      const userId = session.user.id;
+
+      // Check if card already exists
+      const { data: existingCards } = await supabase
+        .from("cards")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("word", popup.text)
+        .limit(1);
+
+      if (existingCards && existingCards.length > 0) {
+        setPopup((prev) =>
+          prev
+            ? {
+                ...prev,
+                saveStatus: "already_saved",
+                saveMessage: "Already saved",
+              }
+            : prev
+        );
+        return;
+      }
+
+      // Prepare card data
+      const cardData = {
+        user_id: userId,
+        word: popup.text,
+        type: popup.isPhrase ? "phrase" : "word",
+        translation: popup.isPhrase
+          ? popup.phraseData?.translation || ""
+          : popup.wordData?.translation || "",
+        transcription: popup.isPhrase
+          ? ""
+          : popup.wordData?.transcription || "",
+        examples: popup.isPhrase
+          ? []
+          : popup.wordData?.examples || [],
+      };
+
+      const { error } = await supabase.from("cards").insert(cardData);
+
+      if (error) {
+        throw error;
+      }
+
+      setPopup((prev) =>
+        prev
+          ? {
+              ...prev,
+              saveStatus: "saved",
+              saveMessage: "Saved ✓",
+            }
+          : prev
+      );
+    } catch (error) {
+      console.error("Error saving card:", error);
+      setPopup((prev) =>
+        prev
+          ? {
+              ...prev,
+              saveStatus: "error",
+              saveMessage: "Error saving card",
+            }
+          : prev
+      );
+    }
+  }, [popup]);
 
   const closePopup = useCallback(() => {
     setPopup(null);
@@ -735,9 +823,30 @@ export default function ReaderPage({
             boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
           }}
         >
-          <p className="text-lg font-bold leading-snug text-[#1a1a1a]">
-            {popup.text}
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-lg font-bold leading-snug text-[#1a1a1a]">
+              {popup.text}
+            </p>
+            {!popup.loading && !popup.error && (popup.wordData || popup.phraseData) && (
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log("Button clicked", { saveStatus: popup.saveStatus });
+                  handleSaveCard();
+                }}
+                disabled={popup.saveStatus === "saving" || popup.saveStatus === "saved" || popup.saveStatus === "already_saved"}
+                className="shrink-0 rounded-md bg-[#2c2c2c] px-3 py-1.5 text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ position: "relative", zIndex: 9999 }}
+              >
+                {popup.saveStatus === "saved" ? "Saved ✓" : popup.saveStatus === "already_saved" ? "Already saved" : popup.saveStatus === "saving" ? "Saving..." : "Save as a card"}
+              </button>
+            )}
+          </div>
+          {popup.saveStatus === "error" && popup.saveMessage && (
+            <p className="mt-2 text-sm text-red-600">{popup.saveMessage}</p>
+          )}
 
           {popup.loading ? (
             <p className="mt-2 text-sm text-[#8a8580]">Загрузка...</p>
@@ -745,7 +854,7 @@ export default function ReaderPage({
             <p className="mt-2 text-sm text-red-600">{popup.error}</p>
           ) : popup.isPhrase && popup.phraseData ? (
             <>
-              <p className="mt-1.5 text-base text-[#1a1a1a]">
+              <p className="mt-3 text-base text-[#1a1a1a]">
                 {popup.phraseData.translation}
               </p>
               <div className="mt-3 border-t border-[#e8e6e1] pt-3">
@@ -756,7 +865,7 @@ export default function ReaderPage({
             </>
           ) : popup.wordData ? (
             <>
-              <p className="mt-1.5 text-base text-[#1a1a1a]">
+              <p className="mt-3 text-base text-[#1a1a1a]">
                 {popup.wordData.translation}
               </p>
               {popup.wordData.transcription ? (
