@@ -29,7 +29,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    setSuccess("Пароль изменён");
+    setSuccess("Password changed");
     setTimeout(() => {
       router.push("/account");
     }, 1500);
@@ -53,7 +53,7 @@ export default function ResetPasswordPage() {
         <main className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-[400px] rounded-lg border border-[#e7e5e4] bg-white px-8 py-8">
             <h1 className="mb-6 text-center text-2xl font-semibold text-[#1a1a1a]">
-              Смена пароля
+              Reset password
             </h1>
 
             <form onSubmit={handleUpdatePassword} className="space-y-4">
@@ -62,7 +62,7 @@ export default function ResetPasswordPage() {
                   htmlFor="new-password"
                   className="mb-1.5 block text-sm text-[#78716c]"
                 >
-                  Новый пароль
+                  New password
                 </label>
                 <input
                   id="new-password"
@@ -73,7 +73,7 @@ export default function ResetPasswordPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className={inputClass}
-                  placeholder="Введите новый пароль"
+                  placeholder="Enter new password"
                 />
               </div>
 
@@ -85,7 +85,7 @@ export default function ResetPasswordPage() {
                 disabled={loading || !!success}
                 className="w-full rounded-md bg-[#2c2c2c] px-4 py-2.5 text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {loading ? "Загрузка..." : success ? "Перенаправление..." : "Сохранить"}
+                {loading ? "Loading..." : success ? "Redirecting..." : "Save"}
               </button>
             </form>
           </div>

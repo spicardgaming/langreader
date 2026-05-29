@@ -50,7 +50,7 @@ export default function AccountPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-[#57534e]">Загрузка...</p>
+        <p className="text-[#57534e]">Loading...</p>
       </div>
     );
   }
@@ -58,7 +58,7 @@ export default function AccountPage() {
   return (
     <>
           <h1 className="mb-6 text-2xl font-semibold text-[#1a1a1a]">
-            Мой кабинет
+            My account
           </h1>
 
           <div className="mb-8 rounded-lg border border-[#e7e5e4] bg-white p-6">
@@ -68,24 +68,24 @@ export default function AccountPage() {
 
           <section className="mb-8">
             <h2 className="mb-4 text-lg font-medium text-[#1a1a1a]">
-              Мои книги
+              My books
             </h2>
             <div className="rounded-lg border border-[#e7e5e4] bg-white p-8 text-center">
-              <p className="text-sm text-[#78716c]">Пока ничего нет</p>
+              <p className="text-sm text-[#78716c]">Nothing here yet</p>
             </div>
           </section>
 
           <section className="mb-8">
             <h2 className="mb-4 text-lg font-medium text-[#1a1a1a]">
-              Мои карточки
+              My cards
             </h2>
             {cardsLoading ? (
               <div className="rounded-lg border border-[#e7e5e4] bg-white p-8 text-center">
-                <p className="text-sm text-[#78716c]">Загрузка...</p>
+                <p className="text-sm text-[#78716c]">Loading...</p>
               </div>
             ) : cards.length === 0 ? (
               <div className="rounded-lg border border-[#e7e5e4] bg-white p-8 text-center">
-                <p className="text-sm text-[#78716c]">Пока ничего нет</p>
+                <p className="text-sm text-[#78716c]">Nothing here yet</p>
               </div>
             ) : (
               <div className="space-y-3">

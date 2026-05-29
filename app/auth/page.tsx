@@ -86,7 +86,7 @@ export default function AuthPage() {
     }
 
     setSuccess(
-      "Регистрация прошла успешно. Проверьте почту для подтверждения аккаунта."
+      "Registration successful. Check your email to confirm your account."
     );
   }
 
@@ -110,7 +110,7 @@ export default function AuthPage() {
       return;
     }
 
-    setSuccess("Ссылка отправлена, проверьте почту");
+    setSuccess("Link sent, check your email");
   }
 
   const inputClass =
@@ -133,7 +133,7 @@ export default function AuthPage() {
                 : "text-[#8a8580] hover:text-[#555]"
             }`}
           >
-            Войти
+            Sign in
           </button>
           <button
             type="button"
@@ -144,7 +144,7 @@ export default function AuthPage() {
                 : "text-[#8a8580] hover:text-[#555]"
             }`}
           >
-            Зарегистрироваться
+            Sign up
           </button>
         </div>
 
@@ -177,7 +177,7 @@ export default function AuthPage() {
                   disabled={loading}
                   className="w-full rounded-md bg-[#2c2c2c] px-4 py-2.5 text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
-                  {loading ? "Загрузка..." : "Отправить ссылку"}
+                  {loading ? "Loading..." : "Send link"}
                 </button>
               </form>
               <button
@@ -185,7 +185,7 @@ export default function AuthPage() {
                 onClick={backToSignIn}
                 className="w-full text-center text-sm text-[#8a8580] hover:text-[#555]"
               >
-                Назад
+                Back
               </button>
             </div>
           ) : (
@@ -213,7 +213,7 @@ export default function AuthPage() {
                   htmlFor="signin-password"
                   className="mb-1.5 block text-sm text-[#8a8580]"
                 >
-                  Пароль
+                  Password
                 </label>
                 <input
                   id="signin-password"
@@ -231,14 +231,14 @@ export default function AuthPage() {
                 disabled={loading}
                 className="w-full rounded-md bg-[#2c2c2c] px-4 py-2.5 text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {loading ? "Загрузка..." : "Войти"}
+                {loading ? "Loading..." : "Sign in"}
               </button>
               <button
                 type="button"
                 onClick={showResetPassword}
                 className="w-full text-center text-xs text-[#8a8580] hover:text-[#555] hover:underline"
               >
-                Забыли пароль?
+                Forgot password?
               </button>
             </form>
           )
@@ -267,7 +267,7 @@ export default function AuthPage() {
                 htmlFor="signup-password"
                 className="mb-1.5 block text-sm text-[#8a8580]"
               >
-                Пароль
+                  Password
               </label>
               <input
                 id="signup-password"
@@ -286,7 +286,7 @@ export default function AuthPage() {
               disabled={loading}
               className="w-full rounded-md bg-[#2c2c2c] px-4 py-2.5 text-sm text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {loading ? "Загрузка..." : "Зарегистрироваться"}
+              {loading ? "Loading..." : "Sign up"}
             </button>
           </form>
         )}

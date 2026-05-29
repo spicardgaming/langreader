@@ -61,10 +61,10 @@ export default function Home() {
                 role="presentation"
               >
                 <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">
-                  Перетащите файл сюда или нажмите чтобы выбрать
+                  Drop a file here or click to select
                 </p>
                 <p className="mt-2 text-xs text-[#a8a29e]">
-                  Поддерживаемые форматы: .txt, .epub
+                  Supported formats: .txt, .epub
                 </p>
               </div>
               <button
@@ -79,7 +79,7 @@ export default function Home() {
 
           <section className="mb-14">
             <h2 className="mb-6 text-lg font-medium text-[#1a1a1a]">
-              Книги для практики
+              Books for practice
             </h2>
             <div className="grid gap-4 sm:grid-cols-3">
               {PRACTICE_BOOKS.map((book) =>
@@ -112,7 +112,7 @@ export default function Home() {
                   <button
                     key={book.id}
                     type="button"
-                    onClick={() => alert("Скоро появится")}
+                    onClick={() => alert("Coming soon")}
                     className={bookCardClassName}
                   >
                     <h3 className="text-base font-medium leading-snug text-[#1a1a1a]">
@@ -141,10 +141,9 @@ export default function Home() {
 
           <section className="mb-16">
             <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">
-              Balaka помогает изучать иностранный язык через чтение книг на
-              оригинале. Выделяйте незнакомые слова и фразы — сервис мгновенно
-              покажет перевод и пояснение в контексте. Загружайте свои тексты
-              или начните с готовых материалов для практики.
+              Balaka helps you learn foreign languages by reading books in their original language. 
+              Select unfamiliar words and phrases — the service instantly shows translation and 
+              explanation in context. Upload your own texts or start with ready-made practice materials.
             </p>
           </section>
     </>

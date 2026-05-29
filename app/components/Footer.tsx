@@ -3,7 +3,7 @@ export default function Footer() {
     <footer className="border-t border-[#e7e5e4] pt-8 pb-4">
       <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="mb-2 text-sm text-[#78716c]">Поделиться:</p>
+          <p className="mb-2 text-sm text-[#78716c]">Share:</p>
           <div className="flex gap-4 text-sm">
             <a
               href="#"
