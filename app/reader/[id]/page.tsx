@@ -488,7 +488,7 @@ export default function ReaderPage({
       return;
     }
 
-    const rawText = range.toString().trim();
+    let rawText = range.toString().trim();
     if (!rawText || !isEnglishSelection(rawText)) {
       return;
     }
