@@ -74,6 +74,8 @@ export async function POST(request: NextRequest) {
   try {
     // Calculate text hash for duplicate detection
     const textHash = btoa(encodeURIComponent(book.original_text.slice(0, 200))).slice(0, 50) + book.original_text.length;
+    console.log('Text hash:', textHash);
+    console.log('Looking for duplicate...');
     
     // Check if we already have a retelling for this text (from any user)
     const { data: existingRetelling } = await supabase
@@ -84,6 +86,8 @@ export async function POST(request: NextRequest) {
       .neq('id', bookId)
       .limit(1)
       .single();
+    
+    console.log('Existing retelling found:', existingRetelling);
     
     if (existingRetelling && existingRetelling.retelling_text) {
       // Use existing retelling
