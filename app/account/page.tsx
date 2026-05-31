@@ -128,6 +128,31 @@ export default function AccountPage() {
     await handleCreateRetelling(bookId);
   };
 
+  const handleDeleteBook = async (bookId: string, bookTitle: string) => {
+    if (!userId) return;
+
+    const confirmed = confirm(`Are you sure you want to delete "${bookTitle}"?`);
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('books')
+        .delete()
+        .eq('id', bookId)
+        .eq('user_id', userId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Reload books after deletion
+      await loadBooks();
+    } catch (error) {
+      console.error('Error deleting book:', error);
+      alert('Error deleting book');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const day = String(date.getDate()).padStart(2, '0');
@@ -227,8 +252,15 @@ export default function AccountPage() {
                           {formatDate(book.created_at)}
                         </p>
                       </div>
-                      <div className="flex items-center">
+                      <div className="flex items-center gap-2">
                         {getStatusDisplay(book.status, book.id)}
+                        <button
+                          onClick={() => handleDeleteBook(book.id, book.title)}
+                          className="text-xs text-[#dc2626] hover:text-[#b91c1c] transition-colors"
+                          aria-label="Delete book"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   </div>

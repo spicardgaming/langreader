@@ -72,7 +72,44 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Send request to Anthropic API
+    // Calculate text hash for duplicate detection
+    const textHash = btoa(encodeURIComponent(book.original_text.slice(0, 200))).slice(0, 50) + book.original_text.length;
+    
+    // Check if we already have a retelling for this text (from any user)
+    const { data: existingRetelling } = await supabase
+      .from('books')
+      .select('retelling_text')
+      .eq('text_hash', textHash)
+      .eq('status', 'done')
+      .neq('id', bookId)
+      .limit(1)
+      .single();
+    
+    if (existingRetelling && existingRetelling.retelling_text) {
+      // Use existing retelling
+      const { error: updateDoneError } = await supabase
+        .from('books')
+        .update({ 
+          retelling_text: existingRetelling.retelling_text,
+          text_hash: textHash,
+          status: 'done' 
+        })
+        .eq('id', bookId);
+
+      if (updateDoneError) {
+        return NextResponse.json(
+          { error: 'Failed to save retelling result' },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({ 
+        success: true,
+        message: 'Retelling completed successfully (from cache)' 
+      });
+    }
+    
+    // No existing retelling found, create new one via Claude
     const prompt = `You are a text summarizer. Rewrite the following text in the SAME LANGUAGE, keeping 50% of the original length. Keep the original paragraph structure — each paragraph in the original should remain a separate paragraph in the rewrite. Do not analyze or interpret — just rewrite more concisely. Do not add your own comments or conclusions. Text: ${book.original_text}`;
 
     const anthropicResponse = await fetch(
@@ -143,6 +180,7 @@ export async function POST(request: NextRequest) {
       .from("books")
       .update({ 
         retelling_text: cleanedText,
+        text_hash: textHash,
         status: "done" 
       })
       .eq("id", bookId);

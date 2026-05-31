@@ -123,12 +123,16 @@ export default function Home() {
     // Save to database
     const title = selectedFile.name.replace(/\.(txt|epub)$/, '');
     
+    // Calculate text hash for duplicate detection
+    const textHash = btoa(encodeURIComponent(fileContent.slice(0, 200))).slice(0, 50) + fileContent.length;
+    
     const { error } = await supabase
       .from('books')
       .insert({
         user_id: session.user.id,
         title: title,
         original_text: fileContent,
+        text_hash: textHash,
         type: 'original',
         status: 'pending',
         language: 'en'
