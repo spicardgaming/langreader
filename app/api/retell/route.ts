@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     }
     
     // No existing retelling found, create new one via Claude
-    const prompt = `You are a text summarizer. Rewrite the following text in the SAME LANGUAGE, keeping 50% of the original length. Keep the original paragraph structure — each paragraph in the original should remain a separate paragraph in the rewrite. Do not analyze or interpret — just rewrite more concisely. Do not add your own comments or conclusions. Text: ${book.original_text}`;
+    const prompt = `You are a text summarizer. Rewrite the following text in the SAME LANGUAGE. Make it easier to read: replace complex phrases and words with simpler ones, remove unnecessary repetitions, keep all ideas and logic. Keep the original paragraph structure. The result should be 60-80% of the original length naturally, not by cutting ideas. Do not analyze or interpret. Text: ${book.original_text}`;
 
     const anthropicResponse = await fetch(
       "https://api.anthropic.com/v1/messages",
