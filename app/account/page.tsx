@@ -10,6 +10,8 @@ type Card = {
   translation: string;
   type: "word" | "phrase";
   created_at: string;
+  transcription: string;
+  examples: Array<{ english: string; russian: string }>;
 };
 
 type Book = {
@@ -20,6 +22,29 @@ type Book = {
   created_at: string;
 };
 
+function ChevronIcon({ up }: { up: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {up ? (
+        <path d="M18 15l-6-6-6 6" />
+      ) : (
+        <path d="M6 9l6 6 6-6" />
+      )}
+    </svg>
+  );
+}
+
 export default function AccountPage() {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -29,6 +54,7 @@ export default function AccountPage() {
   const [cardsLoading, setCardsLoading] = useState(true);
   const [books, setBooks] = useState<Book[]>([]);
   const [booksLoading, setBooksLoading] = useState(true);
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function checkSession() {
@@ -161,6 +187,18 @@ export default function AccountPage() {
     return `${day}.${month}.${year}`;
   };
 
+  const toggleCardExpansion = (cardId: string) => {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) {
+        next.delete(cardId);
+      } else {
+        next.add(cardId);
+      }
+      return next;
+    });
+  };
+
   const getStatusDisplay = (status: Book['status'], bookId: string) => {
     switch (status) {
       case 'pending':
@@ -283,28 +321,78 @@ export default function AccountPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {cards.map((card) => (
-                  <div
-                    key={card.id}
-                    className="rounded-lg border border-[#e7e5e4] bg-white p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-base font-semibold text-[#1a1a1a]">
-                            {card.word}
+                {cards.map((card) => {
+                  const isExpanded = expandedCards.has(card.id);
+                  
+                  return (
+                    <div
+                      key={card.id}
+                      onClick={() => toggleCardExpansion(card.id)}
+                      className={`cursor-pointer transition-all duration-200 ${
+                        isExpanded
+                          ? "rounded-lg border border-[#e0e0e0] bg-white px-6 py-5"
+                          : "rounded-lg border border-[#e7e5e4] bg-white p-4"
+                      }`}
+                      style={isExpanded ? { boxShadow: "0 4px 20px rgba(0,0,0,0.15)" } : undefined}
+                    >
+                      {isExpanded ? (
+                        // EXPANDED STATE
+                        <>
+                          <div className="flex items-start justify-between gap-4">
+                            <p className="text-base font-bold text-[#1a1a1a]">
+                              {card.word}
+                            </p>
+                            <span className="shrink-0 text-[#a8a29e]">
+                              <ChevronIcon up={true} />
+                            </span>
+                          </div>
+                          <p className="mt-2 text-base text-[#1a1a1a]">
+                            {card.translation}
                           </p>
-                          <span className="rounded bg-[#f5f5f5] px-2 py-0.5 text-xs text-[#78716c]">
-                            {card.type === "word" ? "слово" : "фраза"}
+                          {card.transcription && (
+                            <p className="mt-1 text-sm italic text-[#8a8580]">
+                              {card.transcription}
+                            </p>
+                          )}
+                          {card.examples && card.examples.length > 0 && (
+                            <div className="mt-3 border-t border-[#e8e6e1] pt-3">
+                              {card.examples.slice(0, 2).map((example, idx) => (
+                                <div key={idx} className={idx > 0 ? "mt-3" : ""}>
+                                  <p className="text-sm leading-snug text-[#333]">
+                                    {example.english}
+                                  </p>
+                                  <p className="mt-0.5 text-sm leading-snug text-[#8a8580]">
+                                    {example.russian}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        // COLLAPSED STATE
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-base font-semibold text-[#1a1a1a]">
+                                {card.word}
+                              </p>
+                              <span className="rounded bg-[#f5f5f5] px-2 py-0.5 text-xs text-[#78716c]">
+                                {card.type === "word" ? "слово" : "фраза"}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-sm text-[#57534e]">
+                              {card.translation}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-[#a8a29e]">
+                            <ChevronIcon up={false} />
                           </span>
                         </div>
-                        <p className="mt-1 text-sm text-[#57534e]">
-                          {card.translation}
-                        </p>
-                      </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
