@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Footer() {
   return (
     <footer className="border-t border-[#e7e5e4] pt-8 pb-4">
@@ -20,24 +22,30 @@ export default function Footer() {
           </div>
         </div>
         <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-          <a
-            href="#"
+          <Link
+            href="/pricing"
+            className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
+          >
+            Pricing
+          </Link>
+          <Link
+            href="/about"
             className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
           >
             About us
-          </a>
-          <a
-            href="#"
+          </Link>
+          <Link
+            href="/contacts"
             className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
           >
             Contacts
-          </a>
-          <a
-            href="#"
+          </Link>
+          <Link
+            href="/feedback"
             className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
           >
             Your feedback
-          </a>
+          </Link>
         </nav>
       </div>
     </footer>
