@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import fs from "fs";
+import path from "path";
 
 type RetellRequest = {
   bookId: string;
@@ -72,8 +74,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Calculate text hash for duplicate detection
-    const textHash = btoa(encodeURIComponent(book.original_text.slice(0, 200))).slice(0, 50) + book.original_text.length;
+    // Calculate text hash for duplicate detectionconst textHash 
+    const normalizedText = book.original_text
+  .replace(/\s+/g, ' ')
+  .replace(/[«»„""\u2018\u2019\u201c\u201d]/g, '"')
+  .replace(/[^\w\s]/g, '')
+  .toLowerCase()
+  .trim();
+    const textHash = btoa(encodeURIComponent(normalizedText.slice(0, 200))).slice(0, 50) + normalizedText.length;
     console.log('Text hash:', textHash);
     console.log('Looking for duplicate...');
     
@@ -114,7 +122,11 @@ export async function POST(request: NextRequest) {
     }
     
     // No existing retelling found, create new one via Claude
-    const prompt = `You are a text summarizer. Rewrite the following text in the SAME LANGUAGE. Make it easier to read: replace complex phrases and words with simpler ones, remove unnecessary repetitions, keep all ideas and logic. Keep the original paragraph structure. The result should be 60-80% of the original length naturally, not by cutting ideas. Do not analyze or interpret. Text: ${book.original_text}`;
+    const promptTemplate = fs.readFileSync(
+      path.join(process.cwd(), "lib/prompts/retell.md"),
+      "utf-8"
+    );
+    const prompt = promptTemplate + "\n\n" + book.original_text;
 
     const anthropicResponse = await fetch(
       "https://api.anthropic.com/v1/messages",
@@ -172,10 +184,10 @@ export async function POST(request: NextRequest) {
     const lines = retellingText.split('\n');
     let cleanedLines = lines;
     
-    // Remove leading lines that start with #
-    while (cleanedLines.length > 0 && cleanedLines[0]?.trim().startsWith('#')) {
-      cleanedLines = cleanedLines.slice(1);
-    }
+  // Remove leading lines that start with # or ---
+while (cleanedLines.length > 0 && (cleanedLines[0]?.trim().startsWith('#') || cleanedLines[0]?.trim() === '---')) {
+  cleanedLines = cleanedLines.slice(1);
+}
     
     const cleanedText = cleanedLines.join('\n').trim();
 
