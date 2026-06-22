@@ -60,6 +60,7 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -108,6 +109,9 @@ export default function Home() {
   };
 
   const handleUpload = async () => {
+    // Clear previous messages
+    setUploadMessage(null);
+
     // Check authentication
     const { data: { session } } = await supabase.auth.getSession();
     
@@ -118,6 +122,87 @@ export default function Home() {
 
     if (!selectedFile) {
       return;
+    }
+
+    // Check if Pro subscription is required
+    if (process.env.NEXT_PUBLIC_PRO_REQUIRED === 'true') {
+      // Get user profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('plan, chars_used, period_start')
+        .eq('id', session.user.id)
+        .single();
+
+      // Create profile if it doesn't exist
+      if (profileError && profileError.code === 'PGRST116') {
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: session.user.id,
+            plan: 'free',
+            chars_used: 0,
+            period_start: new Date().toISOString()
+          });
+
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          setUploadMessage('Error checking subscription status.');
+          return;
+        }
+
+        // User has free plan, show upgrade message
+        setUploadMessage('upgrade');
+        return;
+      }
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        setUploadMessage('Error checking subscription status.');
+        return;
+      }
+
+      // Check if user has Pro plan
+      if (profile.plan !== 'pro') {
+        setUploadMessage('upgrade');
+        return;
+      }
+
+      // User has Pro plan - check character limit
+      let currentCharsUsed = profile.chars_used || 0;
+      const periodStart = new Date(profile.period_start);
+      const now = new Date();
+      const daysSincePeriodStart = (now.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24);
+
+      // Reset chars_used if period is older than 30 days
+      if (daysSincePeriodStart > 30) {
+        currentCharsUsed = 0;
+        await supabase
+          .from('profiles')
+          .update({
+            chars_used: 0,
+            period_start: now.toISOString()
+          })
+          .eq('id', session.user.id);
+      }
+
+      // Check if adding this file would exceed the limit
+      const newCharsUsed = currentCharsUsed + fileContent.length;
+      if (newCharsUsed > 1000000) {
+        setUploadMessage('limit');
+        return;
+      }
+
+      // Update chars_used
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ chars_used: newCharsUsed })
+        .eq('id', session.user.id);
+
+      if (updateError) {
+        console.error('Error updating chars_used:', updateError);
+        setUploadMessage('Error updating usage statistics.');
+        return;
+      }
     }
 
     // Save to database
@@ -140,7 +225,7 @@ export default function Home() {
 
     if (error) {
       console.error('Error saving book:', error);
-      alert('Error uploading file');
+      setUploadMessage('Error uploading file.');
       return;
     }
 
@@ -205,6 +290,28 @@ export default function Home() {
                 <ArrowIcon />
               </button>
             </div>
+            {uploadMessage && (
+              <div className="mt-2">
+                {uploadMessage === 'upgrade' && (
+                  <p className="text-sm text-[#78716c]">
+                    Upload is available on the Pro plan.{' '}
+                    <Link href="/pricing" className="text-[#1a1a1a] underline underline-offset-2">
+                      Upgrade →
+                    </Link>
+                  </p>
+                )}
+                {uploadMessage === 'limit' && (
+                  <p className="text-sm text-[#dc2626]">
+                    You have reached your monthly limit of 1,000,000 characters.
+                  </p>
+                )}
+                {uploadMessage !== 'upgrade' && uploadMessage !== 'limit' && (
+                  <p className="text-sm text-[#dc2626]">
+                    {uploadMessage}
+                  </p>
+                )}
+              </div>
+            )}
           </section>
 
           <section className="mb-14">

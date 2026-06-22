@@ -6,6 +6,8 @@ What to do:
 - Simplify sentence structure and vocabulary
 - Remove filler words and redundant phrases
 - Fix awkward phrasing
+- Break overly long paragraphs into smaller ones of 2-8 sentences each
+
 
 What NOT to do:
 - Do not remove any idea, argument, fact, or example

@@ -40,7 +40,7 @@ export default function PricingPage() {
             </span>
           </div>
           <h2 className="text-lg font-semibold text-[#1a1a1a] mb-2">Pro</h2>
-          <p className="text-sm text-[#78716c] mb-4">$9 / month</p>
+          <p className="text-sm text-[#78716c] mb-4">$4.99 / month</p>
           <ul className="space-y-2 mb-4">
             <li className="text-sm text-[#57534e]">✓ Everything in Free</li>
             <li className="text-sm text-[#57534e]">✓ Upload your own texts to read</li>
