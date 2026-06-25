@@ -385,6 +385,28 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
         return;
       }
 
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('plan')
+        .eq('id', userId)
+        .single();
+
+      if (profile?.plan !== 'pro') {
+        const { count } = await supabase
+          .from('cards')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId);
+
+        if (count !== null && count >= 100) {
+          setPopup((prev) => prev ? {
+            ...prev,
+            saveStatus: 'error',
+            saveMessage: 'You have saved 100 words. Continue reading for free, or upgrade to Pro to save more.'
+          } : prev);
+          return;
+        }
+      }
+
       const cardData = {
         user_id: userId,
         word: popup.text,
