@@ -1,7 +1,37 @@
 "use client";
 import Link from "next/link";
+import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function PricingPage() {
+  const [loading, setLoading] = useState<string | null>(null);
+
+  async function handleCheckout(priceId: string) {
+    setLoading(priceId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = '/auth';
+        return;
+      }
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId,
+          userId: session.user.id,
+          email: session.user.email,
+        }),
+      });
+      const { url } = await response.json();
+      if (url) window.location.href = url;
+    } catch (error) {
+      console.error('Checkout error:', error);
+    } finally {
+      setLoading(null);
+    }
+  }
+
   return (
     <div className="max-w-[800px] mx-auto py-12 px-4">
       <h1 className="text-2xl font-semibold text-[#1a1a1a] mb-6">
@@ -53,12 +83,11 @@ export default function PricingPage() {
             <li className="text-sm text-[#57534e]">✓ Export cards</li>
             <li className="text-sm text-[#57534e]">✓ Unlimited saved words</li>
           </ul>
-          <a
-            href="#"
-            className="block rounded bg-[#2c2c2c] px-4 py-2 text-sm font-medium text-white hover:opacity-90 w-full mt-4 text-center"
+          <button
+onClick={() => handleCheckout('price_1TmJABHdn6x4W8DuJjbRL0Ch')}
+disabled={loading !== null && loading !== 'price_1TmJABHdn6x4W8DuJjbRL0Ch'}            className="block rounded bg-[#2c2c2c] px-4 py-2 text-sm font-medium text-white hover:opacity-90 w-full mt-4 text-center disabled:opacity-50"
           >
-            Upgrade to Pro
-          </a>
+{loading === 'price_1TmJABHdn6x4W8DuJjbRL0Ch' ? 'Loading...' : 'Upgrade to Pro'}          </button>
         </div>
 
         {/* SUPPORT Plan */}
@@ -70,12 +99,12 @@ export default function PricingPage() {
           <p className="text-sm text-[#57534e] mb-4">
             Help us grow and add new languages, books, and features.
           </p>
-          <a
-            href="#"
-            className="block rounded bg-[#2c2c2c] px-4 py-2 text-sm font-medium text-white hover:opacity-90 w-full mt-4 text-center"
+          <button
+onClick={() => handleCheckout('price_1TmJBfHdn6x4W8DuJBvHhu3S')}
+           disabled={loading !== null && loading !== 'price_1TmJBfHdn6x4W8DuJBvHhu3S'}
+            className="block rounded bg-[#2c2c2c] px-4 py-2 text-sm font-medium text-white hover:opacity-90 w-full mt-4 text-center disabled:opacity-50"
           >
-            Donate
-          </a>
+{loading === 'price_1TmJBfHdn6x4W8DuJBvHhu3S' ? 'Loading...' : 'Donate'}          </button>
         </div>
       </div>
 
