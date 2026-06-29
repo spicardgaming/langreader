@@ -10,6 +10,7 @@ type Book = {
   title: string;
   status: "pending" | "processing" | "done" | "error";
   retelling_text: string | null;
+  original_text: string | null;
   user_id: string;
 };
 
@@ -86,7 +87,8 @@ export default function UserBookReaderPage() {
     );
   }
 
-  if (!book.retelling_text) {
+ const textToRead = book.retelling_text || book.original_text;
+ if (!textToRead) {
     return (
       <div
         className="flex min-h-full items-center justify-center bg-[#f7f5f0] px-4 py-12 text-[#2c2c2c]"
@@ -97,7 +99,7 @@ export default function UserBookReaderPage() {
     );
   }
 
-  const allParagraphs = book.retelling_text
+  const allParagraphs = textToRead
     .split(/\r?\n\r?\n|\r\r/)
     .map(p => p.replace(/\r?\n/g, ' ').trim())
     .filter(p => p.length > 0);
@@ -110,6 +112,41 @@ export default function UserBookReaderPage() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const getPageNumbers = (current: number, total: number): (number | string)[] => {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+
+    const pages: (number | string)[] = [];
+    
+    // Always show first page
+    pages.push(1);
+    
+    // Calculate range around current page
+    const rangeStart = Math.max(2, current - 2);
+    const rangeEnd = Math.min(total - 1, current + 2);
+    
+    // Add ellipsis after first page if needed
+    if (rangeStart > 2) {
+      pages.push('...');
+    }
+    
+    // Add pages around current
+    for (let i = rangeStart; i <= rangeEnd; i++) {
+      pages.push(i);
+    }
+    
+    // Add ellipsis before last page if needed
+    if (rangeEnd < total - 1) {
+      pages.push('...');
+    }
+    
+    // Always show last page
+    pages.push(total);
+    
+    return pages;
   };
 
   return (
@@ -132,19 +169,25 @@ export default function UserBookReaderPage() {
             >
               Previous
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`rounded px-3 py-2 text-sm font-medium shadow-sm transition-colors ${
-                  page === currentPage
-                    ? 'bg-[#2c2c2c] text-white'
-                    : 'bg-white text-[#2c2c2c] hover:bg-[#f5f5f4]'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
+            {getPageNumbers(currentPage, totalPages).map((page, index) => 
+              typeof page === 'string' ? (
+                <span key={`ellipsis-${index}`} className="px-2 text-sm text-[#a8a29e]">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={page}
+                  onClick={() => handlePageChange(page)}
+                  className={`rounded px-3 py-2 text-sm font-medium shadow-sm transition-colors ${
+                    page === currentPage
+                      ? 'bg-[#2c2c2c] text-white'
+                      : 'bg-white text-[#2c2c2c] hover:bg-[#f5f5f4]'
+                  }`}
+                >
+                  {page}
+                </button>
+              )
+            )}
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}

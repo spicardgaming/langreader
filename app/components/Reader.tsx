@@ -165,11 +165,11 @@ function computePopupPlacement(
   return { top, left, isMobile: false };
 }
 
-const WORD_CHAR = /[a-zA-Z'-]/;
+const WORD_CHAR = /\p{L}/u;
 
 function isSingleWord(text: string): boolean {
   const word = text.trim();
-  return word.length > 0 && /^[a-zA-Z'-]+$/.test(word);
+  return word.length > 0 && /^[\p{L}'-]+$/u.test(word);
 }
 
 function countWords(text: string): number {
@@ -182,7 +182,7 @@ function isValidPhrase(text: string): boolean {
 }
 
 function isEnglishSelection(text: string): boolean {
-  return /^[a-zA-Z\s'.,!?-]+$/.test(text.trim());
+  return /^[\p{L}\s'.,!?-]+$/u.test(text.trim());
 }
 
 function ChevronIcon({ up }: { up: boolean }) {
