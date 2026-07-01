@@ -20,6 +20,7 @@ type Book = {
   status: "pending" | "processing" | "done" | "error";
   type: "original" | "retelling";
   created_at: string;
+  progress: number;
 };
 
 function ChevronIcon({ up }: { up: boolean }) {
@@ -97,7 +98,26 @@ export default function AccountPage() {
     checkSession();
   }, [router]);
 
+ 
+    useEffect(() => {
+    const hasProcessing = books.some(b => b.status === 'processing');
+    if (!hasProcessing || !userId) return;
+
+    const interval = setInterval(async () => {
+      console.log('Polling...', userId);
+      const { data } = await supabase
+        .from('books')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      if (data) setBooks(data);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [books, userId]);
+
   const loadBooks = async () => {
+
     if (!userId) return;
     
     setBooksLoading(true);
@@ -199,7 +219,7 @@ export default function AccountPage() {
     });
   };
 
-  const getStatusDisplay = (status: Book['status'], bookId: string) => {
+  const getStatusDisplay = (status: Book['status'], bookId: string, progress: number) => {
     switch (status) {
       case 'pending':
         return (
@@ -211,7 +231,17 @@ export default function AccountPage() {
           </button>
         );
       case 'processing':
-        return <span className="text-sm text-[#78716c]">Processing...</span>;
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <span className="text-sm text-[#78716c]">
+        {(progress ?? 0) > 0 ? `Processing... ${progress}%` : 'Processing...'}
+      </span>
+      <span className="text-xs text-[#a8a29e] whitespace-nowrap text-right">
+        Large texts take time. Keep this tab open!
+      </span>
+    </div>
+  );
+
       case 'done':
         return (
           <a
@@ -291,7 +321,8 @@ export default function AccountPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {getStatusDisplay(book.status, book.id)}
+                        {getStatusDisplay(book.status, book.id, book.progress)}
+
                         <button
                           onClick={() => handleDeleteBook(book.id, book.title)}
                           className="text-xs text-[#dc2626] hover:text-[#b91c1c] transition-colors"

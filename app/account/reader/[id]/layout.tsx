@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   const { data: book } = await supabase
     .from('books')
     .select('title')
-    .eq('id', params.id)
+    .eq('id', (await params).id)
     .single();
 
   if (!book) {

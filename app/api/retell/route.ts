@@ -2,11 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
+export const maxDuration = 300;
 
 type RetellRequest = {
   bookId: string;
   userId: string;
 };
+
+function splitIntoChunks(text: string, maxChunkSize: number = 12000): string[] {
+  const paragraphs = text.split(/\n\n+/);
+  const chunks: string[] = [];
+  let currentChunk = '';
+
+  for (const paragraph of paragraphs) {
+    if (currentChunk.length + paragraph.length + 2 > maxChunkSize && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+      currentChunk = paragraph;
+    } else {
+      currentChunk = currentChunk ? currentChunk + '\n\n' + paragraph : paragraph;
+    }
+  }
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+  return chunks;
+}
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -126,70 +146,104 @@ export async function POST(request: NextRequest) {
       path.join(process.cwd(), "lib/prompts/retell.md"),
       "utf-8"
     );
-    const prompt = promptTemplate + "\n\n" + book.original_text;
-
-    const anthropicResponse = await fetch(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 4096,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      },
-    );
-
-    if (!anthropicResponse.ok) {
-      const details = await anthropicResponse.text();
+    
+    // Split text into chunks
+    const chunks = splitIntoChunks(book.original_text);
+    console.log(`Processing ${chunks.length} chunks...`);
+    const chunkResults: string[] = [];
+    
+    // Process each chunk sequentially
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`Processing chunk ${i + 1}/${chunks.length}`);
+      const prompt = promptTemplate + "\n\n" + chunk;
       
-      // Update status to error
-      await supabase
-        .from("books")
-        .update({ status: "error" })
-        .eq("id", bookId);
-
-      return NextResponse.json(
-        { error: "Anthropic API request failed", details },
-        { status: anthropicResponse.status },
+      const anthropicResponse = await fetch(
+        "https://api.anthropic.com/v1/messages",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 4096,
+            messages: [{ role: "user", content: prompt }],
+          }),
+        },
       );
-    }
 
-    const data = (await anthropicResponse.json()) as {
-      content?: { type: string; text?: string }[];
-    };
+      if (!anthropicResponse.ok) {
+        const details = await anthropicResponse.text();
+        
+        // Update status to error
+        await supabase
+          .from("books")
+          .update({ status: "error" })
+          .eq("id", bookId);
 
-    const textBlock = data.content?.find((block) => block.type === "text");
-    let retellingText = textBlock?.text;
+        return NextResponse.json(
+          { error: `Anthropic API request failed for chunk ${i + 1}/${chunks.length}`, details },
+          { status: anthropicResponse.status },
+        );
+      }
 
-    if (!retellingText) {
-      // Update status to error
+      const data = (await anthropicResponse.json()) as {
+        content?: { type: string; text?: string }[];
+      };
+
+      const textBlock = data.content?.find((block) => block.type === "text");
+      const chunkText = textBlock?.text;
+
+      if (!chunkText) {
+        // Update status to error
+        await supabase
+          .from("books")
+          .update({ status: "error" })
+          .eq("id", bookId);
+
+        return NextResponse.json(
+          { error: `Empty response from Anthropic API for chunk ${i + 1}/${chunks.length}` },
+          { status: 502 },
+        );
+      }
+      
+      chunkResults.push(chunkText);
+
+      const progress = Math.round(((i + 1) / chunks.length) * 100);
       await supabase
-        .from("books")
-        .update({ status: "error" })
-        .eq("id", bookId);
-
-      return NextResponse.json(
-        { error: "Empty response from Anthropic API" },
-        { status: 502 },
-      );
+        .from('books')
+        .update({ progress })
+        .eq('id', bookId);
+      console.log(`Chunk ${i + 1}/${chunks.length} done, progress: ${progress}%`);
     }
+    
+    // Combine all chunk results
+    let retellingText = chunkResults.join('\n\n');
 
     // Clean up retelling text
     const lines = retellingText.split('\n');
     let cleanedLines = lines;
     
-  // Remove leading lines that start with # or ---
-while (cleanedLines.length > 0 && (cleanedLines[0]?.trim().startsWith('#') || cleanedLines[0]?.trim() === '---')) {
-  cleanedLines = cleanedLines.slice(1);
-}
+    // Remove leading lines that start with # or ---
+    while (cleanedLines.length > 0 && (cleanedLines[0]?.trim().startsWith('#') || cleanedLines[0]?.trim() === '---')) {
+      cleanedLines = cleanedLines.slice(1);
+    }
     
-    const cleanedText = cleanedLines.join('\n').trim();
+    // Remove lines that are only Markdown headers (# ## ###)
+    cleanedLines = cleanedLines.filter(line => {
+      const trimmed = line.trim();
+      return !/^#{1,6}$/.test(trimmed);
+    });
+    
+    // Remove bold and italic markdown formatting
+    const cleanedText = cleanedLines
+      .join('\n')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove **bold**
+      .replace(/\*([^*]+)\*/g, '$1')      // Remove *italic*
+      .trim();
 
     // Save retelling result and update status to done
     const { error: updateDoneError } = await supabase
