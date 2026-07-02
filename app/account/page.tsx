@@ -174,6 +174,17 @@ export default function AccountPage() {
     await handleCreateRetelling(bookId);
   };
 
+  const handleReadOriginal = async (bookId: string) => {
+    if (!userId) return;
+    await supabase
+      .from('books')
+      .update({ status: 'done', type: 'original' })
+      .eq('id', bookId)
+      .eq('user_id', userId);
+    router.push(`/account/reader/${bookId}`);
+  };
+
+
   const handleDeleteBook = async (bookId: string, bookTitle: string) => {
     if (!userId) return;
 
@@ -277,10 +288,22 @@ export default function AccountPage() {
   <p className="mt-0.5 text-xs text-[#a8a29e]">{formatDate(book.created_at)}</p>
   <div className="mt-auto pt-2 flex flex-col gap-1">
                       {book.status === 'pending' && (
-                        <button onClick={() => handleCreateRetelling(book.id)} className="rounded bg-[#2c2c2c] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full">
-                          Create retelling
-                        </button>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => handleReadOriginal(book.id)}
+                            className="rounded bg-[#2c2c2c] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full"
+                          >
+                            Read original
+                          </button>
+                          <button
+                            onClick={() => handleCreateRetelling(book.id)}
+                            className="rounded border border-[#2c2c2c] px-3 py-1.5 text-xs font-medium text-[#2c2c2c] transition-opacity hover:opacity-70 w-full"
+                          >
+                            Create retelling
+                          </button>
+                        </div>
                       )}
+
                       {book.status === 'processing' && (
                         <>
                           <span className="text-xs text-[#78716c]">{(book.progress ?? 0) > 0 ? `Processing... ${book.progress}%` : 'Processing...'}</span>
