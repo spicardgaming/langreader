@@ -634,7 +634,14 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
       });
   }, []);
 
+  const handleTouchEnd = useCallback(() => {
+    setTimeout(() => {
+      handleMouseUp();
+    }, 100);
+  }, [handleMouseUp]);
+
   const toggleParagraphTranslation = useCallback(
+
     (index: number, text: string) => {
       const cacheKey = getParagraphCacheKey(text);
       const cached = paragraphTranslationCache[cacheKey];
@@ -760,7 +767,9 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
       className="relative min-h-full bg-[#f7f5f0] py-12 px-4 pb-20 text-[#2c2c2c]"
       style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
       onMouseUp={handleMouseUp}
+      onTouchEnd={handleTouchEnd}
     >
+
       <article ref={articleRef} className="mx-auto w-full max-w-[700px]" data-reader-container>
         <header className="mb-10 border-b border-[#e0ddd6] pb-6">
           <h1 className="text-3xl font-normal leading-tight text-[#1a1a1a]">
