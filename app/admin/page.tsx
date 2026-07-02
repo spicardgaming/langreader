@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 export default function AdminPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [title, setTitle] = useState("");
@@ -14,6 +15,8 @@ export default function AdminPage() {
   const [type, setType] = useState<"original" | "retelling">("original");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -21,6 +24,7 @@ export default function AdminPage() {
   useEffect(() => {
     async function checkAccess() {
       const { data } = await supabase.auth.getSession();
+
       
       if (!data.session) {
         router.push("/auth");
@@ -42,6 +46,13 @@ export default function AdminPage() {
 
     checkAccess();
   }, [router]);
+
+  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -92,6 +103,7 @@ export default function AdminPage() {
 
     if (!title.trim()) {
       setUploadMessage("Please enter a book title");
+
       return;
     }
 
@@ -113,6 +125,22 @@ export default function AdminPage() {
       // Calculate text hash for duplicate detection
       const textHash = btoa(encodeURIComponent(fileContent.slice(0, 200))).slice(0, 50) + fileContent.length;
 
+        // Upload cover image if selected
+let coverUrl = '';
+if (coverFile) {
+  const fileExt = coverFile.name.split('.').pop();
+  const fileName = `${Date.now()}.${fileExt}`;
+  const { error: uploadError } = await supabase.storage
+    .from('covers')
+    .upload(fileName, coverFile, { contentType: coverFile.type });
+  if (!uploadError) {
+    const { data: urlData } = supabase.storage
+      .from('covers')
+      .getPublicUrl(fileName);
+    coverUrl = urlData.publicUrl;
+  }
+}
+
       if (type === 'original') {
         // Save as original book with status 'done'
         const { error } = await supabase
@@ -125,7 +153,8 @@ export default function AdminPage() {
             text_hash: textHash,
             type: 'original',
             status: 'done',
-            language: language
+            language: language,
+            cover_url: coverUrl
           });
 
         if (error) {
@@ -136,6 +165,8 @@ export default function AdminPage() {
         }
 
         setUploadMessage('Book uploaded successfully');
+        setCoverFile(null);
+        setCoverPreview(null);
         // Clear form
         setTitle('');
         setLanguage('en');
@@ -155,7 +186,8 @@ export default function AdminPage() {
             text_hash: textHash,
             type: 'retelling',
             status: 'pending',
-            language: language
+            language: language,
+            cover_url: coverUrl
           })
           .select()
           .single();
@@ -183,6 +215,9 @@ export default function AdminPage() {
         }
 
         setUploadMessage('Book uploaded successfully and retelling is being generated');
+        setCoverFile(null);
+        setCoverPreview(null);
+        
         // Clear form
         setTitle('');
         setLanguage('en');
@@ -273,6 +308,38 @@ export default function AdminPage() {
             <option value="original">Original (read original)</option>
             <option value="retelling">Retelling (simplified retelling)</option>
           </select>
+        </div>
+
+        {/* Cover image */}
+        <div>
+          <label className="block text-sm font-medium text-[#1a1a1a] mb-1">
+            Cover image (optional)
+          </label>
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleCoverSelect}
+            className="hidden"
+          />
+          <div
+            onClick={() => coverInputRef.current?.click()}
+            className="flex cursor-pointer items-center gap-4 rounded-lg border border-[#e7e5e4] bg-white p-4 hover:bg-[#f9f9f9] transition-colors"
+          >
+            {coverPreview ? (
+              <img src={coverPreview} alt="Cover preview" className="h-24 w-16 rounded object-cover" />
+            ) : (
+              <div className="flex h-24 w-16 items-center justify-center rounded bg-[#f5f5f5]">
+                <span className="text-xs text-[#a8a29e]">2:3</span>
+              </div>
+            )}
+            <div>
+              <p className="text-sm text-[#57534e]">
+                {coverFile ? coverFile.name : 'Click to select image'}
+              </p>
+              <p className="mt-1 text-xs text-[#a8a29e]">JPG, PNG or WebP. Recommended: 400×600px</p>
+            </div>
+          </div>
         </div>
 
         {/* File upload zone */}

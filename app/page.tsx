@@ -9,6 +9,7 @@ type PublicBook = {
   title: string;
   language: string;
   type: 'original' | 'retelling';
+  cover_url: string | null;
 };
 
 const bookCardClassName =
@@ -48,7 +49,7 @@ export default function Home() {
     async function loadPublicBooks() {
       const { data, error } = await supabase
         .from('books')
-        .select('id, title, language, type')
+        .select('id, title, language, type, cover_url')
         .eq('is_public', true)
         .eq('status', 'done')
         .order('created_at', { ascending: false });
@@ -326,27 +327,42 @@ export default function Home() {
                 <p className="text-sm text-[#78716c]">No books yet</p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-3">
-                {publicBooks.map((book) => (
-                  <Link
-                    key={book.id}
-                    href={`/reader/${book.id}`}
-                    className={bookCardClassName}
-                  >
-                    <h3 className="text-base font-medium leading-snug text-[#1a1a1a]">
-                      {book.title}
-                    </h3>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="rounded bg-[#f5f5f5] px-2 py-0.5 text-xs text-[#78716c]">
-                        {book.language.toUpperCase()}
-                      </span>
-                      <span className="text-xs text-[#a8a29e]">
-                        {book.type === 'retelling' ? 'Simplified' : 'Original'}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+  {publicBooks.map((book) => (
+    <Link
+      key={book.id}
+      href={`/reader/${book.id}`}
+      className="block no-underline group"
+    >
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg bg-[#f0ede8]">
+        {book.cover_url ? (
+          <img
+            src={book.cover_url}
+            alt={book.title}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center p-3 text-center">
+            <span className="text-xs font-medium text-[#78716c] leading-snug">
+              {book.title}
+            </span>
+          </div>
+        )}
+        <div className="absolute top-2 left-2">
+          <span className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            {book.language.toUpperCase()}
+          </span>
+        </div>
+      </div>
+      <p className="mt-2 text-sm font-medium leading-snug text-[#1a1a1a] line-clamp-2">
+        {book.title}
+      </p>
+      <p className="mt-0.5 text-xs text-[#a8a29e]">
+        {book.type === 'retelling' ? 'Simplified' : 'Original'}
+      </p>
+    </Link>
+  ))}
+</div>
             )}
           </section>
 

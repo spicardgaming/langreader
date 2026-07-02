@@ -219,56 +219,8 @@ export default function AccountPage() {
     });
   };
 
-  const getStatusDisplay = (status: Book['status'], bookId: string, progress: number) => {
-    switch (status) {
-      case 'pending':
-        return (
-          <button
-            onClick={() => handleCreateRetelling(bookId)}
-            className="rounded bg-[#2c2c2c] px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          >
-            Create retelling
-          </button>
-        );
-      case 'processing':
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <span className="text-sm text-[#78716c]">
-        {(progress ?? 0) > 0 ? `Processing... ${progress}%` : 'Processing...'}
-      </span>
-      <span className="text-xs text-[#a8a29e] whitespace-nowrap text-right">
-        Large texts take time. Keep this tab open!
-      </span>
-    </div>
-  );
-
-      case 'done':
-        return (
-          <a
-            href={`/account/reader/${bookId}`}
-            className="rounded bg-[#2c2c2c] px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          >
-            Read
-          </a>
-        );
-      case 'error':
-        return (
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-[#dc2626]">Error</span>
-            <button
-              onClick={() => handleRetry(bookId)}
-              className="rounded bg-[#dc2626] px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            >
-              Retry
-            </button>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
   if (loading) {
+
     return (
       <div className="flex items-center justify-center py-12">
         <p className="text-[#57534e]">Loading...</p>
@@ -276,7 +228,19 @@ export default function AccountPage() {
     );
   }
 
+  const COVER_COLORS = [
+    'bg-[#b5c9e2]',
+    'bg-[#e2b5b5]',
+    'bg-[#b5e2c9]',
+    'bg-[#e2d5b5]',
+    'bg-[#c9b5e2]',
+    'bg-[#e2c9b5]',
+    'bg-[#b5e2e2]',
+    'bg-[#d5e2b5]',
+  ];
+
   return (
+
     <>
           <h1 className="mb-6 text-2xl font-semibold text-[#1a1a1a]">
             My account
@@ -300,41 +264,47 @@ export default function AccountPage() {
                 <p className="text-sm text-[#78716c]">Nothing here yet</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {books.map((book) => (
-                  <div
-                    key={book.id}
-                    className="rounded-lg border border-[#e7e5e4] bg-white p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold text-[#1a1a1a]">
-                            {book.title}
-                          </h3>
-                          <span className="rounded bg-[#f5f5f5] px-2 py-0.5 text-xs text-[#78716c]">
-                            {book.type}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-[#a8a29e]">
-                          {formatDate(book.created_at)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getStatusDisplay(book.status, book.id, book.progress)}
+                  <div key={book.id} className="flex flex-col h-full">
+                    <div className={`relative aspect-[2/3] w-full overflow-hidden rounded-lg flex flex-col items-center justify-center p-3 text-center ${COVER_COLORS[book.id.charCodeAt(0) % COVER_COLORS.length]}`}>
 
-                        <button
-                          onClick={() => handleDeleteBook(book.id, book.title)}
-                          className="text-xs text-[#dc2626] hover:text-[#b91c1c] transition-colors"
-                          aria-label="Delete book"
-                        >
-                          Delete
+                      <span className="text-xs font-medium text-[#78716c] leading-snug">{book.title}</span>
+                      <span className="mt-2 rounded bg-black/10 px-1.5 py-0.5 text-[10px] text-[#78716c]">{book.type}</span>
+                    </div>
+                    <div className="mt-2 flex flex-col flex-1">
+  <p className="text-sm font-medium leading-snug text-[#1a1a1a] line-clamp-2">{book.title}</p>
+  <p className="mt-0.5 text-xs text-[#a8a29e]">{formatDate(book.created_at)}</p>
+  <div className="mt-auto pt-2 flex flex-col gap-1">
+                      {book.status === 'pending' && (
+                        <button onClick={() => handleCreateRetelling(book.id)} className="rounded bg-[#2c2c2c] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full">
+                          Create retelling
                         </button>
-                      </div>
+                      )}
+                      {book.status === 'processing' && (
+                        <>
+                          <span className="text-xs text-[#78716c]">{(book.progress ?? 0) > 0 ? `Processing... ${book.progress}%` : 'Processing...'}</span>
+                          <span className="text-[10px] text-[#a8a29e] leading-snug">Large texts take time. Keep this tab open!</span>
+                        </>
+                      )}
+                      {book.status === 'done' && (
+                        <a href={`/account/reader/${book.id}`} className="rounded bg-[#2c2c2c] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full text-center">
+                          Read
+                        </a>
+                      )}
+                      {book.status === 'error' && (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-[#dc2626]">Error</span>
+                          <button onClick={() => handleRetry(book.id)} className="rounded bg-[#dc2626] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full">Retry</button>
+                        </div>
+                      )}
+                      <button onClick={() => handleDeleteBook(book.id, book.title)} className="text-[10px] text-[#dc2626] hover:text-[#b91c1c] transition-colors text-left mt-1">Delete</button>
+                    </div>
                     </div>
                   </div>
                 ))}
               </div>
+
             )}
           </section>
 
