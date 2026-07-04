@@ -44,14 +44,20 @@ export default function Home() {
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [publicBooks, setPublicBooks] = useState<PublicBook[]>([]);
   const [booksLoading, setBooksLoading] = useState(true);
+  const [learningLanguage, setLearningLanguage] = useState('en');
 
   useEffect(() => {
+    const saved = localStorage.getItem('balaka_learning_language');
+    if (saved) setLearningLanguage(saved);
+
     async function loadPublicBooks() {
+      const lang = localStorage.getItem('balaka_learning_language') || 'en';
       const { data, error } = await supabase
         .from('books')
         .select('id, title, language, type, cover_url')
         .eq('is_public', true)
         .eq('status', 'done')
+        .eq('language', lang)
         .order('created_at', { ascending: false });
 
       if (!error && data) {
@@ -367,11 +373,17 @@ export default function Home() {
           </section>
 
           <section className="mb-16">
-            <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">
-              Balaka helps you learn foreign languages by reading books in their original language. 
-              Select unfamiliar words and phrases — the service instantly shows translation and 
-              explanation in context. Upload your own texts or start with ready-made practice materials.
-            </p>
+            <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">Balaka helps you read texts or books that you want by uploading them or using one from our online library. While reading, choose unfamiliar phrases or words, and we'll show you their translation and usage in various contexts. The Balaka main page features books in the foreign language you're learning. We believe that reading books and texts in the original language helps us learn other languages, memorize words and expressions, and ultimately understand another culture.</p>
+
+ <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">In addition to reading classic books and texts in a foreign language, we've made it possible for you to upload a text in the language you're learning. To save you time and make the learning process more engaging, we offer two options:</p>
+<ul>
+<li>Learn the language by reading the original text</li>
+<li>Learn the language by reading a simplified version of the text.</li>
+</ul>
+
+ <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">The original text preserves the author's form, words, and expressions. However, sometimes this can be more difficult. In this case, you can upload your text online and read a simplified version of the translation, with simpler and clearer words and sentences.</p>
+
+ <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">In developing this service, we took into account our own experience, as well as the experiences and challenges of our friends who have also been or are currently learning and studying a new foreign language.</p>
           </section>
     </>
   );

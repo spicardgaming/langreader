@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 type Example = {
   english: string;
   russian: string;
+  translation?: string;
 };
 
 type VerbFormEntry = {
@@ -78,7 +79,7 @@ const POPUP_GAP = 8;
 const POPUP_VIEWPORT_MARGIN = 8;
 const POPUP_MAX_HEIGHT_VH = 70;
 const PARAGRAPH_FETCH_TIMEOUT_MS = 30_000;
-const PARAGRAPH_LOAD_ERROR = "Ошибка загрузки. Попробуйте снова";
+const PARAGRAPH_LOAD_ERROR = "Loading error. Please try again";
 const PARAGRAPH_TRANSLATIONS_STORAGE_KEY = "paragraph_translations";
 const PARAGRAPH_CACHE_KEY_LENGTH = 50;
 
@@ -595,7 +596,7 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
     fetch("/api/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ word: text, context, isPhrase }),
+      body: JSON.stringify({ word: text, context, isPhrase, nativeLanguage: localStorage.getItem('balaka_native_language') || 'ru' }),
     })
       .then(async (res) => {
         const payload = (await res.json()) as
@@ -683,10 +684,11 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              word: text,
-              context: text,
-              isParagraph: true,
-            }),
+            word: text,
+            context: text,
+            isParagraph: true,
+            nativeLanguage: localStorage.getItem('balaka_native_language') || 'ru',
+          }),
             signal: controller.signal,
           });
 
@@ -810,7 +812,7 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
                       }}
                       className="mt-1 shrink-0 rounded p-1 text-[#a8a29e] transition-colors hover:bg-[#f0eeea] hover:text-[#78716c]"
                       aria-label={
-                        isOpen ? "Свернуть перевод" : "Перевести абзац"
+                        isOpen ? "Collapse translation" : "Translate paragraph"
                       }
                       aria-expanded={isOpen}
                     >
@@ -819,7 +821,7 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
                   </div>
                   {isOpen && pState?.loading ? (
                     <p className="mt-3 text-sm text-[#8a8580]">
-                      Загрузка перевода...
+                      Loading translation...
                     </p>
                   ) : null}
                   {isOpen && pState?.error ? (
@@ -896,7 +898,7 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
           )}
 
           {popup.loading ? (
-            <p className="mt-2 text-sm text-[#8a8580]">Загрузка...</p>
+            <p className="mt-2 text-sm text-[#8a8580]">Loading...</p>
           ) : popup.error ? (
             <p className="mt-2 text-sm text-red-600">{popup.error}</p>
           ) : popup.isPhrase && popup.phraseData ? (
@@ -928,7 +930,7 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
                         {example.english}
                       </p>
                       <p className="mt-0.5 text-sm leading-snug text-[#8a8580]">
-                        {example.russian}
+                        {example.russian ?? example.translation}
                       </p>
                     </li>
                   ))}

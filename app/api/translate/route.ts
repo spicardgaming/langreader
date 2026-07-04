@@ -5,11 +5,13 @@ type TranslateRequest = {
   context: string;
   isPhrase?: boolean;
   isParagraph?: boolean;
+  nativeLanguage?: string;
 };
 
 type Example = {
   english: string;
-  russian: string;
+  russian?: string;
+  translation?: string;
 };
 
 type VerbFormEntry = {
@@ -76,7 +78,7 @@ function parseWordJsonFromText(text: string): WordTranslateResponse {
         typeof e === "object" &&
         e !== null &&
         typeof (e as Example).english === "string" &&
-        typeof (e as Example).russian === "string",
+        (typeof (e as Example).russian === "string" || typeof (e as Example).translation === "string"),
     ) ||
     typeof parsed.isVerb !== "boolean" ||
     (parsed.isVerb && !isValidVerbForms(parsed.verbForms)) ||
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { word, context, isPhrase, isParagraph } = body;
+  const { word, context, isPhrase, isParagraph, nativeLanguage = 'Russian' } = body;
   if (!word || typeof word !== "string") {
     return NextResponse.json({ error: "word is required" }, { status: 400 });
   }
@@ -137,32 +139,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "context is required" }, { status: 400 });
   }
 
-  const prompt = isParagraph
-    ? `You are helping a Russian speaker learn English.
+  const LANGUAGE_NAMES: Record<string, string> = {
+    en: 'English', es: 'Spanish', fr: 'French', de: 'German',
+    it: 'Italian', pt: 'Portuguese', ru: 'Russian', uk: 'Ukrainian', ca: 'Catalan',
+  };
+  const targetLanguage = LANGUAGE_NAMES[nativeLanguage] ?? 'Russian';
 
-Translate the following English paragraph into Russian completely. Do not shorten, summarize, or omit any part of the text.
+  const prompt = isParagraph
+    ? `You are helping a ${targetLanguage} speaker learn a foreign language.
+
+Translate the following English paragraph into ${targetLanguage} completely. Do not shorten, summarize, or omit any part of the text.
 
 Paragraph:
 "${word}"
 
 Return ONLY valid JSON (no markdown, no text outside JSON) with exactly this field:
-- "paragraphTranslation": the full Russian translation of the entire paragraph
+- "paragraphTranslation": the full ${targetLanguage} translation of the entire paragraph
 
 Example format:
 {"paragraphTranslation":"..."}`
     : isPhrase
-    ? `You are helping a Russian speaker learn English.
+    ? `You are helping a ${targetLanguage} speaker learn a foreign language.
 
 Phrase: "${word}"
 Context sentence: "${context}"
 
 Return ONLY valid JSON (no markdown, no text outside JSON) with exactly these fields:
-- "translation": Russian translation of the phrase in this context
-- "explanation": brief explanation in Russian of the phrase meaning and usage (1-2 sentences)
+- "translation": ${targetLanguage} translation of the phrase in this context
+- "explanation": brief explanation in ${targetLanguage} of the phrase meaning and usage (1-2 sentences)
 
 Example format:
 {"translation":"...","explanation":"..."}`
-    : `You are helping a Russian speaker learn English vocabulary.
+    : `You are helping a ${targetLanguage} speaker learn foreign language vocabulary.
 
 Word: "${word}"
 Context sentence: "${context}"
@@ -171,18 +179,18 @@ First determine whether the word is used as a verb in this context sentence.
 If it is a verb, identify which English tense it is used in within that context.
 
 Return ONLY valid JSON (no markdown, no explanation) with exactly these fields:
-- "translation": Russian translation of the word in this context
+- "translation": ${targetLanguage} translation of the word in this context
 - "transcription": IPA phonetic transcription of the English word
 - "examples": array of exactly 2 objects, each with:
   - "english": an example sentence in English that uses the word naturally
-  - "russian": Russian translation of that sentence
+  - "translation": ${targetLanguage} translation of that sentence
 - "isVerb": boolean — true if the word is a verb in this context
 - "verbForms": if isVerb is true, an object with:
   - "tense": name of the tense as used in the context (in English, e.g. "Present Simple", "Past Simple", "Present Continuous")
   - "forms": array of ALL conjugation forms for that tense only of the verb's lemma (infinitive), each object with:
     - "name": English label for the grammatical form (e.g. "I", "You", "He/She/It", "We", "They", or "I form", "He/She/It form" when clearer for the tense)
     - "form": the English verb form
-  Keep "translation", "examples[].russian", and all other learner-facing explanations in Russian. Only "tense" and form "name" labels are in English.
+  Keep "translation", "examples[].translation", and all other learner-facing explanations in ${targetLanguage}. Only "tense" and form "name" labels are in English.
   If isVerb is false, set "verbForms" to null
 
 Example format (non-verb):
