@@ -104,8 +104,7 @@ export default function AccountPage() {
     if (!hasProcessing || !userId) return;
 
     const interval = setInterval(async () => {
-      console.log('Polling...', userId);
-      const { data } = await supabase
+       const { data } = await supabase
         .from('books')
         .select('*')
         .eq('user_id', userId)
