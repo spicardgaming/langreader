@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Balaka — Read Books and Learn with Instant Translation in different languages',
-  description: 'Use Balaka - Service for learning by reading books in a foreign language. Highlight words and phrases — get instant translation and explanation in context.',
+  title: 'Balaka — Read or Upload Books and Learn with Instant Translation in different languages',
+  description: 'Use Balaka - Your reading companion for learning foreign languages through books. Highlight words and phrases — get instant translation and explanation in context.',
 };
 
 export default function RootLayout({
