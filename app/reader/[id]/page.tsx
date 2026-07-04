@@ -35,6 +35,10 @@ export default function ReaderPage({
 
       if (!error && data) {
         setBook(data);
+        const saved = localStorage.getItem(`reading_progress_${id}`);
+        if (saved) {
+          setCurrentPage(parseInt(saved, 10));
+        }
       }
       setLoading(false);
     }
@@ -68,6 +72,7 @@ export default function ReaderPage({
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+    localStorage.setItem(`reading_progress_${id}`, String(page));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

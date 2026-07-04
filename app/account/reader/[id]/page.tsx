@@ -48,6 +48,10 @@ export default function UserBookReaderPage() {
       }
 
       setBook(bookData as Book);
+      const saved = localStorage.getItem(`reading_progress_${bookId}`);
+      if (saved) {
+        setCurrentPage(parseInt(saved, 10));
+      }
       setLoading(false);
     }
 
@@ -111,6 +115,7 @@ export default function UserBookReaderPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+    localStorage.setItem(`reading_progress_${bookId}`, String(page));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -151,9 +156,7 @@ export default function UserBookReaderPage() {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-[700px] px-4 py-4">
-        <p className="text-sm text-[#78716c]">Total paragraphs: {allParagraphs.length}, Total pages: {totalPages}</p>
-      </div>
+      
       <Reader title={book.title} paragraphs={currentParagraphs} />
       
       {totalPages > 1 && (
