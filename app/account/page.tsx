@@ -277,7 +277,8 @@ export default function AccountPage() {
               <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {books.map((book) => (
                   <div key={book.id} className="flex flex-col h-full">
-                    <div className={`relative aspect-[2/3] w-full overflow-hidden rounded-lg flex flex-col items-center justify-center p-3 text-center ${COVER_COLORS[book.id.charCodeAt(0) % COVER_COLORS.length]}`}>
+                    <div className={`relative aspect-[2/3] w-full overflow-hidden rounded-lg flex flex-col items-center justify-center p-3 text-center ${COVER_COLORS[book.id.charCodeAt(0) % COVER_COLORS.length]} ${book.status === 'done' ? 'cursor-pointer' : ''}`}
+                    onClick={() => book.status === 'done' && router.push(`/account/reader/${book.id}`)}>
 
                       <span className="text-xs font-medium text-[#78716c] leading-snug">{book.title}</span>
                       <span className="mt-2 rounded bg-black/10 px-1.5 py-0.5 text-[10px] text-[#78716c]">{book.type}</span>
