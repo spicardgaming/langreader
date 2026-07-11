@@ -217,7 +217,7 @@ export default function Home() {
     // Calculate text hash for duplicate detection
     const textHash = btoa(encodeURIComponent(fileContent.slice(0, 200))).slice(0, 50) + fileContent.length;
     
-    const { error } = await supabase
+    const { data: bookData, error } = await supabase
       .from('books')
       .insert({
         user_id: session.user.id,
@@ -227,13 +227,21 @@ export default function Home() {
         type: 'original',
         status: 'pending',
         language: 'en'
-      });
+      })
+      .select()
+      .single();
 
-    if (error) {
+    if (error || !bookData) {
       console.error('Error saving book:', error);
       setUploadMessage('Error uploading file.');
       return;
     }
+
+    fetch('/api/format', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookId: bookData.id, userId: session.user.id }),
+    });
 
     router.push('/account');
   };
@@ -372,19 +380,24 @@ export default function Home() {
             )}
           </section>
 
-          <section className="mb-16">
-            <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">Balaka helps you read texts or books that you want by uploading them or using one from our online library. While reading, choose unfamiliar phrases or words, and we'll show you their translation and usage in various contexts. The Balaka main page features books in the foreign language you're learning. We believe that reading books and texts in the original language helps us learn other languages, memorize words and expressions, and ultimately understand another culture.</p>
-
- <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">In addition to reading classic books and texts in a foreign language, we've made it possible for you to upload a text in the language you're learning. To save you time and make the learning process more engaging, we offer two options:</p>
-<ul>
-<li>Learn the language by reading the original text</li>
-<li>Learn the language by reading a simplified version of the text.</li>
-</ul>
-
- <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">The original text preserves the author's form, words, and expressions. However, sometimes this can be more difficult. In this case, you can upload your text online and read a simplified version of the translation, with simpler and clearer words and sentences.</p>
-
- <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">In developing this service, we took into account our own experience, as well as the experiences and challenges of our friends who have also been or are currently learning and studying a new foreign language.</p>
-          </section>
+          <section className="mb-16 space-y-4">
+  <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">
+    Balaka helps you read texts or books that you want by uploading them or using one from our online library. While reading, choose unfamiliar phrases or words, and we'll show you their translation and usage in various contexts. The Balaka main page features books in the foreign language you're learning. We believe that reading books and texts in the original language helps us learn other languages, memorize words and expressions, and ultimately understand another culture.
+  </p>
+  <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">
+    In addition to reading classic books and texts in a foreign language, we've made it possible for you to upload a text in the language you're learning. To save you time and make the learning process more engaging, we offer two options:
+  </p>
+  <ul className="list-disc pl-5 space-y-1 text-sm text-[#57534e] sm:text-base">
+    <li>Learn the language by reading the original text</li>
+    <li>Learn the language by reading a simplified version of the text</li>
+  </ul>
+  <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">
+    The original text preserves the author's form, words, and expressions. However, sometimes this can be more difficult. In this case, you can upload your text online and read a simplified version of the translation, with simpler and clearer words and sentences.
+  </p>
+  <p className="text-sm leading-relaxed text-[#57534e] sm:text-base">
+    In developing this service, we took into account our own experience, as well as the experiences and challenges of our friends who have also been or are currently learning and studying a new foreign language.
+  </p>
+</section>
     </>
   );
 }

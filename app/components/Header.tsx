@@ -5,14 +5,24 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-const LANGUAGES = [
+const LEARNING_LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Spanish' },
-  { code: 'fr', label: 'French' },
   { code: 'de', label: 'German' },
+  // { code: 'fr', label: 'French' },
+  // { code: 'it', label: 'Italian' },
+  // { code: 'pt', label: 'Portuguese' },
+  // { code: 'ca', label: 'Catalan' },
+];
+
+const NATIVE_LANGUAGES = [
+  { code: 'ru', label: 'Russian' },
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'de', label: 'German' },
+  { code: 'fr', label: 'French' },
   { code: 'it', label: 'Italian' },
   { code: 'pt', label: 'Portuguese' },
-  { code: 'ru', label: 'Russian' },
   { code: 'uk', label: 'Ukrainian' },
   { code: 'ca', label: 'Catalan' },
 ];
@@ -140,13 +150,13 @@ export default function Header() {
           <span>I learn</span>
           <LanguageDropdown
             value={learningLanguage}
-            languages={LANGUAGES}
+            languages={LEARNING_LANGUAGES}
             onChange={(code) => handleLanguageChange('learning', code)}
           />
           <span>I know</span>
           <LanguageDropdown
             value={nativeLanguage}
-            languages={LANGUAGES}
+            languages={NATIVE_LANGUAGES}
             onChange={(code) => handleLanguageChange('native', code)}
           />
         </div>

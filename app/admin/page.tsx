@@ -143,28 +143,42 @@ if (coverFile) {
 
       if (type === 'original') {
         // Save as original book with status 'done'
-        const { error } = await supabase
-          .from('books')
-          .insert({
-            user_id: session.user.id,
-            title: title.trim(),
-            original_text: fileContent,
-            retelling_text: '',
-            text_hash: textHash,
-            type: 'original',
-            status: 'done',
-            language: language,
-            cover_url: coverUrl
-          });
+        const { data: bookData, error } = await supabase
+  .from('books')
+  .insert({
+    user_id: session.user.id,
+    title: title.trim(),
+    original_text: fileContent,
+    retelling_text: '',
+    text_hash: textHash,
+    type: 'original',
+    status: 'pending',
+    language: language,
+    cover_url: coverUrl
+  })
+  .select()
+  .single();
 
-        if (error) {
-          console.error('Error saving book:', error);
-          setUploadMessage('Error uploading book');
-          setIsUploading(false);
-          return;
-        }
+if (error || !bookData) {
+  console.error('Error saving book:', error);
+  setUploadMessage('Error uploading book');
+  setIsUploading(false);
+  return;
+}
 
-        setUploadMessage('Book uploaded successfully');
+const formatResponse = await fetch('/api/format', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ bookId: bookData.id, userId: session.user.id }),
+});
+
+if (!formatResponse.ok) {
+  setUploadMessage('Book uploaded but formatting failed');
+  setIsUploading(false);
+  return;
+}
+
+setUploadMessage('Book uploaded and formatted successfully');
         setCoverFile(null);
         setCoverPreview(null);
         // Clear form
