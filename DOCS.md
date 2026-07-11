@@ -62,21 +62,32 @@ Note: `STRIPE_WEBHOOK_SECRET` in Vercel must be the **production** webhook secre
 
 ## 3. Adding a book to the public library
 
+### Where to upload
+**Always use `langreader.vercel.app/admin`** — not localhost. Books are stored in Supabase (not in code), so local and production share the same database. Uploading locally still writes to the production database, so it's simpler to use the live admin page directly.
+
+Use localhost only when testing a new feature before deploying.
+
+### Upload steps
 1. Log in with admin email account
-2. Go to `/admin`
+2. Go to `langreader.vercel.app/admin`
 3. Fill in the form:
    - **Book title** — display name
    - **Language** — language of the text
-   - **Type:** `Original` (no Claude call) or `Retelling` (Claude simplifies)
+   - **Type:** `Original` (formatted for readability, no content changes) or `Retelling` (Claude simplifies)
    - **Cover image** — optional, JPG/PNG/WebP, recommended 400×600px (2:3 ratio)
 4. Upload `.txt` file → click **Upload**
-5. Go to **Supabase → Table Editor → books**
-6. Find the book → set `is_public = true` → save
-7. Book appears on the main page
+5. Wait for processing to complete (progress shown in admin account)
+6. Go to **Supabase → Table Editor → books**
+7. Find the book → set `is_public = true` → save
+8. Book appears on the main page
 
 **Important:** Only books with `is_public = true` AND `status = done` appear on the main page.
 
 **Source for copyright-free books:** [Project Gutenberg](https://www.gutenberg.org)
+
+### What happens during upload
+- **Original:** text is processed through Claude for readability formatting (breaks long paragraphs, fixes whitespace) without changing content
+- **Retelling:** Claude simplifies the text to 70-80% length with simpler vocabulary
 
 ---
 
@@ -90,6 +101,8 @@ Supabase → Table Editor → `profiles`
 | plan | `free` or `pro` |
 | chars_used | characters used this month |
 | period_start | start of current billing period |
+| native_language | language user knows (translation target) |
+| learning_language | language user is learning (library filter) |
 
 ### Manually upgrade a user to Pro
 Supabase → `profiles` → find user by `id` → set `plan = pro`
@@ -99,7 +112,28 @@ Supabase → Authentication → Users → find by email → copy UUID
 
 ---
 
-## 5. Testing Stripe payments locally
+## 5. Admin account management
+
+### Change admin password
+Go to the site → Sign in → Forgot password → enter admin email → follow the link in email → set new password. Works like any regular user account.
+
+### Switching to a new admin account
+1. Register a new account with the new admin email
+2. Update `NEXT_PUBLIC_ADMIN_EMAIL` in Vercel → Environment Variables
+3. Update `NEXT_PUBLIC_ADMIN_EMAIL` in `.env.local`
+4. Redeploy: Vercel → Deployments → latest → Redeploy
+5. Books uploaded by the old admin remain in Supabase and stay public — they are not affected
+
+### Deleting the admin account
+Not recommended. Books in Supabase are linked to the admin's `user_id`. If the account is deleted:
+- Public books (`is_public=true`) will still appear on the main page
+- But the `user_id` will point to a non-existent user — potential RLS issues in the future
+
+If you must delete it, first transfer ownership of books by updating `user_id` in the `books` table to the new admin's user ID.
+
+---
+
+## 6. Testing Stripe payments locally
 
 Requires Stripe CLI (`stripe.exe` in project root).
 
@@ -124,7 +158,7 @@ Copy the `whsec_...` secret → put in `.env.local` as `STRIPE_WEBHOOK_SECRET` �
 
 ---
 
-## 6. Toggling the Pro paywall
+## 7. Toggling the Pro paywall
 
 **Vercel → Environment Variables:**
 - `NEXT_PUBLIC_PRO_REQUIRED=false` — everyone can upload (soft launch)
@@ -135,7 +169,7 @@ After changing → manual redeploy:
 
 ---
 
-## 7. Updating the retelling prompt
+## 8. Updating the retelling prompt
 
 Edit `lib/prompts/retell.md` directly — no code changes needed.
 
@@ -145,26 +179,64 @@ git commit -m "update retelling prompt"
 git push
 ```
 
+## 9. Updating the formatting prompt
+
+Edit `lib/prompts/format.md` directly — no code changes needed.
+
+```bash
+git add .
+git commit -m "update format prompt"
+git push
+```
+
 ---
 
-## 8. Key Supabase tables
+## 10. Managing available languages
+
+Languages are defined in `app/components/Header.tsx`:
+
+```ts
+// Languages users can learn (must have books in library)
+const LEARNING_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'de', label: 'German' },
+  // Add more when books are available:
+  // { code: 'fr', label: 'French' },
+];
+
+// Languages users can know (translation target)
+const NATIVE_LANGUAGES = [
+  { code: 'ru', label: 'Russian' },
+  { code: 'en', label: 'English' },
+  // Add more as needed
+];
+```
+
+To add a language: uncomment the line (or add a new one) → commit → push → Vercel deploys in 1-2 min.
+
+**Before adding a learning language**, make sure there are books in that language in the library — otherwise users will see an empty library.
+
+---
+
+## 11. Key Supabase tables
 
 | Table | Purpose |
 |-------|---------|
 | `books` | All books (user + admin library) |
 | `cards` | Saved vocabulary cards |
-| `profiles` | User plan, usage stats |
+| `profiles` | User plan, usage stats, language preferences |
 
 ### Making a book public
 `books` table → find row → set `is_public = true`
 
-### Resetting a stuck retelling
+### Resetting a stuck retelling or formatting
 `books` table → find row → set `status = pending`, `progress = 0`
-User can then click "Create retelling" again.
+User can then click "Create retelling" again, or re-upload for formatting.
 
 ---
 
-## 9. Supabase Storage
+## 12. Supabase Storage
 
 Bucket `covers` — public bucket for book cover images.
 - Admin uploads via `/admin` form
@@ -173,11 +245,11 @@ Bucket `covers` — public bucket for book cover images.
 
 ---
 
-## 10. Reading progress
+## 13. Reading progress
 
 Reading progress is saved to `localStorage` per book:
 - Key: `reading_progress_${bookId}`
 - Value: page number (string)
 - Works for both public books (`/reader/[id]`) and user books (`/account/reader/[id]`)
-- Device-specific (not synced across devices — see Possible Improvements)
+- Device-specific (not synced across devices — see Possible Improvements in SNAPSHOT.md)
 

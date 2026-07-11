@@ -173,6 +173,25 @@ export default function AccountPage() {
     await handleCreateRetelling(bookId);
   };
 
+  const handleRetryFormat = async (bookId: string) => {
+    if (!userId) return;
+    await supabase
+      .from('books')
+      .update({ status: 'processing', progress: 0 })
+      .eq('id', bookId)
+      .eq('user_id', userId);
+    setBooks(prevBooks =>
+      prevBooks.map(book =>
+        book.id === bookId ? { ...book, status: 'processing' as const, progress: 0 } : book
+      )
+    );
+    fetch('/api/format', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookId, userId }),
+    });
+  };
+
   const handleReadOriginal = async (bookId: string) => {
     if (!userId) return;
     await supabase
@@ -316,11 +335,15 @@ export default function AccountPage() {
                         </a>
                       )}
                       {book.status === 'error' && (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-[#dc2626]">Error</span>
-                          <button onClick={() => handleRetry(book.id)} className="rounded bg-[#dc2626] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full">Retry</button>
-                        </div>
-                      )}
+  <div className="flex flex-col gap-1">
+    <span className="text-xs font-medium text-[#dc2626]">Error</span>
+    {book.type === 'original' ? (
+      <button onClick={() => handleRetryFormat(book.id)} className="rounded bg-[#dc2626] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full">Retry formatting</button>
+    ) : (
+      <button onClick={() => handleRetry(book.id)} className="rounded bg-[#dc2626] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full">Retry</button>
+    )}
+  </div>
+)}
                       <button onClick={() => handleDeleteBook(book.id, book.title)} className="text-[10px] text-[#dc2626] hover:text-[#b91c1c] transition-colors text-left mt-1">Delete</button>
                     </div>
                     </div>
