@@ -10,7 +10,7 @@ type RetellRequest = {
 };
 
 function splitIntoChunks(text: string, maxChunkSize: number = 12000): string[] {
-  const paragraphs = text.split(/\n\n+/);
+  const paragraphs = text.split(/\n+/);
   const chunks: string[] = [];
   let currentChunk = '';
 
@@ -28,7 +28,34 @@ function splitIntoChunks(text: string, maxChunkSize: number = 12000): string[] {
   return chunks;
 }
 
+function enforceMaxSentencesPerParagraph(text: string, maxSentences: number = 5): string {
+  const paragraphs = text.split(/\n\n+/);
+  console.log(`enforceMaxSentencesPerParagraph: ${paragraphs.length} paragraphs found`);
+  const result: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    const trimmed = paragraph.trim();
+    if (!trimmed) continue;
+
+    const sentences = trimmed.match(/[^.!?]+[.!?]+["'')\]]*\s*/g) || [trimmed];
+    console.log(`  Paragraph: ${sentences.length} sentences, length ${trimmed.length}`);
+
+    if (sentences.length <= maxSentences) {
+      result.push(trimmed);
+      continue;
+    }
+
+    for (let i = 0; i < sentences.length; i += maxSentences) {
+      const group = sentences.slice(i, i + maxSentences).join('').trim();
+      if (group) result.push(group);
+    }
+  }
+
+  return result.join('\n\n');
+}
+
 export async function POST(request: NextRequest) {
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -245,11 +272,14 @@ export async function POST(request: NextRequest) {
       .replace(/\*([^*]+)\*/g, '$1')      // Remove *italic*
       .trim();
 
+      console.log('About to call enforceMaxSentencesPerParagraph, cleanedText length:', cleanedText.length);
+    const finalText = enforceMaxSentencesPerParagraph(cleanedText, 5);
+
     // Save retelling result and update status to done
     const { error: updateDoneError } = await supabase
       .from("books")
       .update({ 
-        retelling_text: cleanedText,
+        retelling_text: finalText,
         text_hash: textHash,
         status: "done" 
       })

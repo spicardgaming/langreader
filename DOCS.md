@@ -253,3 +253,33 @@ Reading progress is saved to `localStorage` per book:
 - Works for both public books (`/reader/[id]`) and user books (`/account/reader/[id]`)
 - Device-specific (not synced across devices — see Possible Improvements in SNAPSHOT.md)
 
+
+---
+
+## 14. Uploading large books (important)
+
+### Problem
+Vercel has a maximum execution time limit for serverless functions. For large books (>200KB), the formatting or retelling process may timeout on Vercel, leaving the book stuck at a partial progress percentage.
+
+### Solution for public library books
+**Always upload public books locally**, not through `langreader.vercel.app/admin`.
+
+Steps:
+1. Run local dev server: `npm run dev`
+2. Go to `http://localhost:3000/admin`
+3. Upload the book — formatting runs without time limits
+4. After status shows `done` in your account, go to Supabase → `books`
+5. Set `is_public = true` for the book
+6. Book appears on the main page
+
+Books are stored in Supabase (cloud), not on your local PC. After uploading locally, you can shut down your computer — the book stays in Supabase permanently.
+
+### Solution for user-uploaded books
+User books are smaller (personal texts) — Vercel limits are less likely to be an issue. If a book gets stuck:
+1. Supabase → `books` → find the book → set `status = error`
+2. User sees "Retry formatting" button in their account
+3. User clicks retry — formatting restarts from scratch
+
+### Future solution (when scaling)
+For production at scale, consider migrating heavy processing (retelling, formatting) to Railway or Render — full servers without time limits (~$5-20/month). Vercel stays for the frontend.
+

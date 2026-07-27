@@ -8,6 +8,7 @@ type Book = {
   id: string;
   title: string;
   original_text: string;
+  retelling_text: string | null;
   language: string;
 };
 
@@ -27,7 +28,7 @@ export default function ReaderPage({
     async function loadBook() {
       const { data, error } = await supabase
         .from('books')
-        .select('id, title, original_text, language')
+        .select('id, title, original_text, retelling_text, language')
         .eq('id', id)
         .eq('is_public', true)
         .eq('status', 'done')
@@ -61,7 +62,8 @@ export default function ReaderPage({
     );
   }
 
-  const allParagraphs = book.original_text
+  const textToRead = book.retelling_text || book.original_text;
+  const allParagraphs = textToRead
     .split(/\r?\n\r?\n|\r\r/)
     .map(p => p.replace(/\r?\n/g, ' ').trim())
     .filter(p => p.length > 0);

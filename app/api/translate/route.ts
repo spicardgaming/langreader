@@ -6,6 +6,7 @@ type TranslateRequest = {
   isPhrase?: boolean;
   isParagraph?: boolean;
   nativeLanguage?: string;
+  learningLanguage?: string;
 };
 
 type Example = {
@@ -131,8 +132,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { word, context, isPhrase, isParagraph, nativeLanguage = 'Russian' } = body;
-  if (!word || typeof word !== "string") {
+const { word, context, isPhrase, isParagraph, nativeLanguage = 'Russian', learningLanguage = 'en' } = body;  if (!word || typeof word !== "string") {
     return NextResponse.json({ error: "word is required" }, { status: 400 });
   }
   if (!isParagraph && typeof context !== "string") {
@@ -144,11 +144,10 @@ export async function POST(request: NextRequest) {
     it: 'Italian', pt: 'Portuguese', ru: 'Russian', uk: 'Ukrainian', ca: 'Catalan',
   };
   const targetLanguage = LANGUAGE_NAMES[nativeLanguage] ?? 'Russian';
-
+  const sourceLanguage = LANGUAGE_NAMES[learningLanguage] ?? 'English';
   const prompt = isParagraph
-    ? `You are helping a ${targetLanguage} speaker learn a foreign language.
-
-Translate the following English paragraph into ${targetLanguage} completely. Do not shorten, summarize, or omit any part of the text.
+    ? `You are helping a ${targetLanguage} speaker learn ${sourceLanguage}.
+Translate the following ${sourceLanguage} paragraph into ${targetLanguage} completely. Do not shorten, summarize, or omit any part of the text.
 
 Paragraph:
 "${word}"
@@ -159,9 +158,9 @@ Return ONLY valid JSON (no markdown, no text outside JSON) with exactly this fie
 Example format:
 {"paragraphTranslation":"..."}`
     : isPhrase
-    ? `You are helping a ${targetLanguage} speaker learn a foreign language.
+? `You are helping a ${targetLanguage} speaker learn ${sourceLanguage}.
 
-Phrase: "${word}"
+Phrase (in ${sourceLanguage}): "${word}"
 Context sentence: "${context}"
 
 Return ONLY valid JSON (no markdown, no text outside JSON) with exactly these fields:
@@ -170,26 +169,28 @@ Return ONLY valid JSON (no markdown, no text outside JSON) with exactly these fi
 
 Example format:
 {"translation":"...","explanation":"..."}`
-    : `You are helping a ${targetLanguage} speaker learn foreign language vocabulary.
+: `You are helping a ${targetLanguage} speaker learn ${sourceLanguage} vocabulary.
 
-Word: "${word}"
+Word (in ${sourceLanguage}): "${word}"
 Context sentence: "${context}"
 
 First determine whether the word is used as a verb in this context sentence.
-If it is a verb, identify which English tense it is used in within that context.
+If it is a verb, identify which ${sourceLanguage} tense/mood it is used in within that context.
 
 Return ONLY valid JSON (no markdown, no explanation) with exactly these fields:
 - "translation": ${targetLanguage} translation of the word in this context
-- "transcription": IPA phonetic transcription of the English word
+- "transcription": IPA phonetic transcription of the ${sourceLanguage} word
 - "examples": array of exactly 2 objects, each with:
-  - "english": an example sentence in English that uses the word naturally
+  - "english": an example sentence in ${sourceLanguage} that uses the word naturally
   - "translation": ${targetLanguage} translation of that sentence
+
 - "isVerb": boolean — true if the word is a verb in this context
 - "verbForms": if isVerb is true, an object with:
-  - "tense": name of the tense as used in the context (in English, e.g. "Present Simple", "Past Simple", "Present Continuous")
-  - "forms": array of ALL conjugation forms for that tense only of the verb's lemma (infinitive), each object with:
-    - "name": English label for the grammatical form (e.g. "I", "You", "He/She/It", "We", "They", or "I form", "He/She/It form" when clearer for the tense)
-    - "form": the English verb form
+  - "tense": name of the ${sourceLanguage} tense/mood as used in the context, labeled in English (e.g. "Present Simple", "Preterite", "Subjunctive")
+  - "forms": array of ALL conjugation forms for that tense only of the verb's lemma (infinitive) IN ${sourceLanguage}, each object with:
+    - "name": English label for the grammatical person (e.g. "I", "You", "He/She/It", "We", "They", or the appropriate persons for ${sourceLanguage} grammar)
+    - "form": the ${sourceLanguage} verb form
+
   Keep "translation", "examples[].translation", and all other learner-facing explanations in ${targetLanguage}. Only "tense" and form "name" labels are in English.
   If isVerb is false, set "verbForms" to null
 

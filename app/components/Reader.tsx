@@ -596,8 +596,7 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
     fetch("/api/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ word: text, context, isPhrase, nativeLanguage: localStorage.getItem('balaka_native_language') || 'ru' }),
-    })
+body: JSON.stringify({ word: text, context, isPhrase, nativeLanguage: localStorage.getItem('balaka_native_language') || 'ru', learningLanguage: localStorage.getItem('balaka_learning_language') || 'en' }),    })
       .then(async (res) => {
         const payload = (await res.json()) as
           | (WordTranslateResult & { error?: string })

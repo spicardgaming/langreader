@@ -10,7 +10,7 @@ type FormatRequest = {
 };
 
 function splitIntoChunks(text: string, maxChunkSize: number = 12000): string[] {
-  const paragraphs = text.split(/\n\n+/);
+  const paragraphs = text.split(/\n+/);
   const chunks: string[] = [];
   let currentChunk = '';
 
@@ -28,7 +28,32 @@ function splitIntoChunks(text: string, maxChunkSize: number = 12000): string[] {
   return chunks;
 }
 
+function enforceMaxSentencesPerParagraph(text: string, maxSentences: number = 6): string {
+  const paragraphs = text.split(/\n\n+/);
+  const result: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    const trimmed = paragraph.trim();
+    if (!trimmed) continue;
+
+    const sentences = trimmed.match(/[^.!?]+[.!?]+["'')\]]*\s*/g) || [trimmed];
+
+    if (sentences.length <= maxSentences) {
+      result.push(trimmed);
+      continue;
+    }
+
+    for (let i = 0; i < sentences.length; i += maxSentences) {
+      const group = sentences.slice(i, i + maxSentences).join('').trim();
+      if (group) result.push(group);
+    }
+  }
+
+  return result.join('\n\n');
+}
+
 export async function POST(request: NextRequest) {
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -58,6 +83,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { bookId, userId } = body;
+  console.log('Format request:', { bookId, userId });
   if (!bookId || typeof bookId !== "string") {
     return NextResponse.json({ error: "bookId is required" }, { status: 400 });
   }
@@ -100,6 +126,9 @@ export async function POST(request: NextRequest) {
     );
 
     // Split text into chunks
+    console.log('Book text length:', book.original_text.length);
+console.log('First 200 chars:', book.original_text.slice(0, 200));
+
     const chunks = splitIntoChunks(book.original_text);
     console.log(`Processing ${chunks.length} chunks...`);
     const chunkResults: string[] = [];
@@ -126,7 +155,11 @@ export async function POST(request: NextRequest) {
           }),
         },
       );
-
+      
+      console.log('Anthropic response status:', anthropicResponse.status);
+const errorDetails = await anthropicResponse.clone().text();
+console.log('Anthropic error details:', errorDetails);
+      
       if (!anthropicResponse.ok) {
         const details = await anthropicResponse.text();
 
@@ -173,7 +206,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Combine all chunk results
-    const formattedText = chunkResults.join('\n\n').trim();
+const joinedText = chunkResults.join('\n\n').trim();
+const formattedText = enforceMaxSentencesPerParagraph(joinedText, 6);
 
     // Save formatted text and update status to done
     const { error: updateDoneError } = await supabase
