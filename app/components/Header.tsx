@@ -16,7 +16,7 @@ const LEARNING_LANGUAGES = [
 ];
 
 const NATIVE_LANGUAGES = [
-  { code: 'ru', label: 'Russian' },
+  
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Spanish' },
   { code: 'de', label: 'German' },
@@ -25,6 +25,18 @@ const NATIVE_LANGUAGES = [
   { code: 'pt', label: 'Portuguese' },
   { code: 'uk', label: 'Ukrainian' },
   { code: 'ca', label: 'Catalan' },
+  { code: 'zh', label: 'Chinese' },
+  { code: 'ja', label: 'Japanese' },
+  { code: 'ko', label: 'Korean' },
+  { code: 'ar', label: 'Arabic' },
+  { code: 'hi', label: 'Hindi' },
+  { code: 'tr', label: 'Turkish' },
+  { code: 'pl', label: 'Polish' },
+  { code: 'nl', label: 'Dutch' },
+  { code: 'vi', label: 'Vietnamese' },
+  { code: 'th', label: 'Thai' },
+  { code: 'id', label: 'Indonesian' },
+  { code: 'ru', label: 'Russian' },
 ];
 
 type LanguageDropdownProps = {

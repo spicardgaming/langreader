@@ -142,6 +142,8 @@ const { word, context, isPhrase, isParagraph, nativeLanguage = 'Russian', learni
   const LANGUAGE_NAMES: Record<string, string> = {
     en: 'English', es: 'Spanish', fr: 'French', de: 'German',
     it: 'Italian', pt: 'Portuguese', ru: 'Russian', uk: 'Ukrainian', ca: 'Catalan',
+    zh: 'Chinese', ja: 'Japanese', ko: 'Korean', ar: 'Arabic', hi: 'Hindi',
+    tr: 'Turkish', pl: 'Polish', nl: 'Dutch', vi: 'Vietnamese', th: 'Thai', id: 'Indonesian',
   };
   const targetLanguage = LANGUAGE_NAMES[nativeLanguage] ?? 'Russian';
   const sourceLanguage = LANGUAGE_NAMES[learningLanguage] ?? 'English';

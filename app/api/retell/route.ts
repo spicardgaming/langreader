@@ -30,7 +30,6 @@ function splitIntoChunks(text: string, maxChunkSize: number = 12000): string[] {
 
 function enforceMaxSentencesPerParagraph(text: string, maxSentences: number = 5): string {
   const paragraphs = text.split(/\n\n+/);
-  console.log(`enforceMaxSentencesPerParagraph: ${paragraphs.length} paragraphs found`);
   const result: string[] = [];
 
   for (const paragraph of paragraphs) {
@@ -38,9 +37,7 @@ function enforceMaxSentencesPerParagraph(text: string, maxSentences: number = 5)
     if (!trimmed) continue;
 
     const sentences = trimmed.match(/[^.!?]+[.!?]+["'')\]]*\s*/g) || [trimmed];
-    console.log(`  Paragraph: ${sentences.length} sentences, length ${trimmed.length}`);
-
-    if (sentences.length <= maxSentences) {
+      if (sentences.length <= maxSentences) {
       result.push(trimmed);
       continue;
     }
@@ -272,8 +269,7 @@ export async function POST(request: NextRequest) {
       .replace(/\*([^*]+)\*/g, '$1')      // Remove *italic*
       .trim();
 
-      console.log('About to call enforceMaxSentencesPerParagraph, cleanedText length:', cleanedText.length);
-    const finalText = enforceMaxSentencesPerParagraph(cleanedText, 5);
+      const finalText = enforceMaxSentencesPerParagraph(cleanedText, 5);
 
     // Save retelling result and update status to done
     const { error: updateDoneError } = await supabase

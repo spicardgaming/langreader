@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { bookId, userId } = body;
-  console.log('Format request:', { bookId, userId });
+
   if (!bookId || typeof bookId !== "string") {
     return NextResponse.json({ error: "bookId is required" }, { status: 400 });
   }
@@ -126,9 +126,6 @@ export async function POST(request: NextRequest) {
     );
 
     // Split text into chunks
-    console.log('Book text length:', book.original_text.length);
-console.log('First 200 chars:', book.original_text.slice(0, 200));
-
     const chunks = splitIntoChunks(book.original_text);
     console.log(`Processing ${chunks.length} chunks...`);
     const chunkResults: string[] = [];
@@ -156,9 +153,6 @@ console.log('First 200 chars:', book.original_text.slice(0, 200));
         },
       );
       
-      console.log('Anthropic response status:', anthropicResponse.status);
-const errorDetails = await anthropicResponse.clone().text();
-console.log('Anthropic error details:', errorDetails);
       
       if (!anthropicResponse.ok) {
         const details = await anthropicResponse.text();
