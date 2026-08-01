@@ -23,9 +23,14 @@ export default function ReaderPage({
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadBook() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id ?? null;
+      setUserId(currentUserId);
+
       const { data, error } = await supabase
         .from('books')
         .select('id, title, original_text, retelling_text, language')
@@ -36,15 +41,31 @@ export default function ReaderPage({
 
       if (!error && data) {
         setBook(data);
+
         const saved = localStorage.getItem(`reading_progress_${id}`);
         if (saved) {
           setCurrentPage(parseInt(saved, 10));
+        }
+
+        if (currentUserId) {
+          const { data: progressData } = await supabase
+            .from('reading_progress')
+            .select('page')
+            .eq('user_id', currentUserId)
+            .eq('book_id', id)
+            .single();
+
+          if (progressData) {
+            setCurrentPage(progressData.page);
+            localStorage.setItem(`reading_progress_${id}`, String(progressData.page));
+          }
         }
       }
       setLoading(false);
     }
     loadBook();
   }, [id]);
+
 
   if (loading) {
     return (
@@ -76,7 +97,20 @@ export default function ReaderPage({
     setCurrentPage(page);
     localStorage.setItem(`reading_progress_${id}`, String(page));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (userId) {
+      supabase
+        .from('reading_progress')
+        .upsert(
+          { user_id: userId, book_id: id, page, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,book_id' }
+        )
+        .then(({ error }) => {
+          if (error) console.error('Failed to sync reading progress:', error);
+        });
+    }
   };
+
 
   const getPageNumbers = (current: number, total: number): (number | string)[] => {
     if (total <= 7) {

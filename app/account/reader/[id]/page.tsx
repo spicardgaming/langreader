@@ -24,6 +24,7 @@ export default function UserBookReaderPage() {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadBook() {
@@ -33,6 +34,8 @@ export default function UserBookReaderPage() {
         router.push("/auth");
         return;
       }
+
+      setUserId(session.user.id);
 
       const { data: bookData, error } = await supabase
         .from("books")
@@ -48,15 +51,30 @@ export default function UserBookReaderPage() {
       }
 
       setBook(bookData as Book);
+
       const saved = localStorage.getItem(`reading_progress_${bookId}`);
       if (saved) {
         setCurrentPage(parseInt(saved, 10));
       }
+
+      const { data: progressData } = await supabase
+        .from('reading_progress')
+        .select('page')
+        .eq('user_id', session.user.id)
+        .eq('book_id', bookId)
+        .single();
+
+      if (progressData) {
+        setCurrentPage(progressData.page);
+        localStorage.setItem(`reading_progress_${bookId}`, String(progressData.page));
+      }
+
       setLoading(false);
     }
 
     loadBook();
   }, [bookId, router]);
+
 
   if (loading) {
     return (
@@ -117,7 +135,20 @@ export default function UserBookReaderPage() {
     setCurrentPage(page);
     localStorage.setItem(`reading_progress_${bookId}`, String(page));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (userId) {
+      supabase
+        .from('reading_progress')
+        .upsert(
+          { user_id: userId, book_id: bookId, page, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,book_id' }
+        )
+        .then(({ error }) => {
+          if (error) console.error('Failed to sync reading progress:', error);
+        });
+    }
   };
+
 
   const getPageNumbers = (current: number, total: number): (number | string)[] => {
     if (total <= 7) {

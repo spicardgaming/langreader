@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
               plan: 'pro',
               period_start: new Date().toISOString(),
               chars_used: 0,
+              stripe_subscription_id: session.subscription as string,
             })
             .eq('id', userId);
 

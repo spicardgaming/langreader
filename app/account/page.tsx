@@ -56,6 +56,9 @@ export default function AccountPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [booksLoading, setBooksLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [profile, setProfile] = useState<{ plan: string } | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [cancelState, setCancelState] = useState<"idle" | "cancelling">("idle");
 
   useEffect(() => {
     async function checkSession() {
@@ -69,6 +72,18 @@ export default function AccountPage() {
       setUserEmail(data.session.user.email || null);
       setUserId(data.session.user.id);
       setLoading(false);
+
+      // Load user profile (plan)
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", data.session.user.id)
+        .single();
+
+      if (profileData) {
+        setProfile(profileData);
+      }
+
 
       // Load user books
       const { data: booksData, error: booksError } = await supabase
@@ -236,7 +251,61 @@ export default function AccountPage() {
     return `${day}.${month}.${year}`;
   };
 
+  const handleUpgrade = async () => {
+    if (!userId) return;
+    setCheckoutLoading(true);
+    try {
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
+          userId,
+          email: userEmail,
+        }),
+      });
+      const data = await response.json();
+      if (data.url) window.location.href = data.url;
+    } catch (error) {
+      console.error('Checkout error:', error);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!userId) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel your Pro subscription? You will lose access to uploading and retelling texts."
+    );
+    if (!confirmed) return;
+
+    setCancelState("cancelling");
+
+    try {
+      const response = await fetch('/api/stripe/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (response.ok) {
+        window.alert("Your Pro subscription has been cancelled.");
+        setProfile((prev) => (prev ? { ...prev, plan: 'free' } : prev));
+      } else {
+        window.alert("Something went wrong. Please try again or contact support.");
+      }
+    } catch (error) {
+      console.error('Cancel subscription error:', error);
+      window.alert("Something went wrong. Please try again or contact support.");
+    } finally {
+      setCancelState("idle");
+    }
+  };
+
   const toggleCardExpansion = (cardId: string) => {
+
     setExpandedCards((prev) => {
       const next = new Set(prev);
       if (next.has(cardId)) {
@@ -275,10 +344,33 @@ export default function AccountPage() {
             My account
           </h1>
 
-          <div className="mb-8 rounded-lg border border-[#e7e5e4] bg-white p-6">
-            <p className="text-sm text-[#78716c]">Email:</p>
-            <p className="mt-1 text-base text-[#1a1a1a]">{userEmail}</p>
+          <div className="mb-8 flex flex-col gap-4 rounded-lg border border-[#e7e5e4] bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-[#78716c]">Email:</p>
+              <p className="mt-1 text-base text-[#1a1a1a]">{userEmail}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              {profile?.plan === 'free' && (
+                <button
+                  onClick={handleUpgrade}
+                  disabled={checkoutLoading}
+                  className="rounded bg-[#2c2c2c] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {checkoutLoading ? 'Loading...' : 'Upgrade to read your texts'}
+                </button>
+              )}
+              {profile?.plan === 'pro' && (
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={cancelState === 'cancelling'}
+                  className="text-sm text-[#78716c] underline hover:text-[#1a1a1a] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {cancelState === 'cancelling' ? 'Cancelling...' : 'Cancel Pro account'}
+                </button>
+              )}
+            </div>
           </div>
+
 
           <section className="mb-8">
             <h2 className="mb-4 text-lg font-medium text-[#1a1a1a]">

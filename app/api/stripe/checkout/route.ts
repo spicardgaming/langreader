@@ -35,6 +35,11 @@ console.log('priceId:', priceId, 'PRO_PRICE_ID:', process.env.STRIPE_PRO_PRICE_I
       metadata: {
         userId,
       },
+      subscription_data: mode === 'subscription' ? {
+        metadata: {
+          userId,
+        },
+      } : undefined,
       customer_email: email,
     });
 
