@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { callProcessingApi } from "@/lib/processing";
 
 type Card = {
   id: string;
@@ -158,13 +159,7 @@ export default function AccountPage() {
     );
 
     try {
-      const response = await fetch('/api/retell', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ bookId, userId }),
-      });
+      const response = await callProcessingApi('retell', bookId);
 
       if (!response.ok) {
         throw new Error('Failed to create retelling');
@@ -200,11 +195,7 @@ export default function AccountPage() {
         book.id === bookId ? { ...book, status: 'processing' as const, progress: 0 } : book
       )
     );
-    fetch('/api/format', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookId, userId }),
-    });
+    callProcessingApi('format', bookId);
   };
 
   const handleReadOriginal = async (bookId: string) => {

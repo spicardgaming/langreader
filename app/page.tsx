@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { callProcessingApi } from "@/lib/processing";
 
 type PublicBook = {
   id: string;
@@ -237,11 +238,7 @@ export default function Home() {
       return;
     }
 
-    fetch('/api/format', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookId: bookData.id, userId: session.user.id }),
-    });
+    callProcessingApi('format', bookData.id);
 
     router.push('/account');
   };

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { callProcessingApi } from "@/lib/processing";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -166,11 +167,7 @@ if (error || !bookData) {
   return;
 }
 
-const formatResponse = await fetch('/api/format', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ bookId: bookData.id, userId: session.user.id }),
-});
+const formatResponse = await callProcessingApi('format', bookData.id);
 
 if (!formatResponse.ok) {
   setUploadMessage('Book uploaded but formatting failed');
@@ -214,13 +211,7 @@ setUploadMessage('Book uploaded and formatted successfully');
         }
 
         // Call /api/retell to generate retelling
-        const response = await fetch('/api/retell', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ bookId: bookData.id, userId: session.user.id }),
-        });
+        const response = await callProcessingApi('retell', bookData.id);
 
         if (!response.ok) {
           setUploadMessage('Book uploaded but retelling generation failed');
