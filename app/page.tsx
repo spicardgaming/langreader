@@ -131,6 +131,12 @@ export default function Home() {
       return;
     }
 
+    // Hard cap: no single file may exceed 2,000,000 characters, regardless of plan or remaining quota
+    if (fileContent.length > 2000000) {
+      setUploadMessage('toolarge');
+      return;
+    }
+
     // Check if Pro subscription is required
     if (process.env.NEXT_PUBLIC_PRO_REQUIRED === 'true') {
       // Get user profile
@@ -192,11 +198,18 @@ export default function Home() {
           .eq('id', session.user.id);
       }
 
-      // Check if adding this file would exceed the limit
+      // Check if adding this file would exceed the monthly limit
       const newCharsUsed = currentCharsUsed + fileContent.length;
-      if (newCharsUsed > 1000000) {
-        setUploadMessage('limit');
-        return;
+      let graceUpload = false;
+
+      if (newCharsUsed > 2000000) {
+        if (currentCharsUsed >= 2000000) {
+          // Already over the limit from a previous upload this period — hard block, no grace
+          setUploadMessage('limit');
+          return;
+        }
+        // First time crossing the limit this period — let this one through for free
+        graceUpload = true;
       }
 
       // Update chars_used
@@ -209,6 +222,10 @@ export default function Home() {
         console.error('Error updating chars_used:', updateError);
         setUploadMessage('Error updating usage statistics.');
         return;
+      }
+
+      if (graceUpload) {
+        window.alert('You have reached your monthly limit of 2,000,000 characters. Anyway, we will finish this task for you for free.');
       }
     }
 
@@ -237,8 +254,6 @@ export default function Home() {
       setUploadMessage('Error uploading file.');
       return;
     }
-
-    callProcessingApi('format', bookData.id);
 
     router.push('/account');
   };
@@ -313,10 +328,15 @@ export default function Home() {
                 )}
                 {uploadMessage === 'limit' && (
                   <p className="text-sm text-[#dc2626]">
-                    You have reached your monthly limit of 1,000,000 characters.
+                    You have reached your monthly limit of 2,000,000 characters.
                   </p>
                 )}
-                {uploadMessage !== 'upgrade' && uploadMessage !== 'limit' && (
+                {uploadMessage === 'toolarge' && (
+                  <p className="text-sm text-[#dc2626]">
+                    This file is too large (max 2,000,000 characters per upload). Please split it into smaller parts.
+                  </p>
+                )}
+                {uploadMessage !== 'upgrade' && uploadMessage !== 'limit' && uploadMessage !== 'toolarge' && (
                   <p className="text-sm text-[#dc2626]">
                     {uploadMessage}
                   </p>

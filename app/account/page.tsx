@@ -198,14 +198,32 @@ export default function AccountPage() {
     callProcessingApi('format', bookId);
   };
 
-  const handleReadOriginal = async (bookId: string) => {
+const handleReadOriginal = async (bookId: string) => {
     if (!userId) return;
-    await supabase
-      .from('books')
-      .update({ status: 'done', type: 'original' })
-      .eq('id', bookId)
-      .eq('user_id', userId);
-    router.push(`/account/reader/${bookId}`);
+
+    setBooks(prevBooks =>
+      prevBooks.map(book =>
+        book.id === bookId ? { ...book, status: 'processing' as const } : book
+      )
+    );
+
+    try {
+      const response = await callProcessingApi('format', bookId);
+
+      if (!response.ok) {
+        throw new Error('Failed to format book');
+      }
+
+      await loadBooks();
+    } catch (error) {
+      console.error('Error formatting book:', error);
+      setBooks(prevBooks =>
+        prevBooks.map(book =>
+          book.id === bookId ? { ...book, status: 'error' as const } : book
+        )
+      );
+      alert('Error, try again');
+    }
   };
 
 
