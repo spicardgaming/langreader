@@ -2,29 +2,9 @@
 _Last updated: July 2026_
 
 ## Current status
-Stage 4 complete. UI/UX improvements done. Language switcher implemented and working. Currently mid-task: adding Upgrade to Pro / Cancel Pro buttons to account page.
+Stage 4 complete. UI/UX improvements done. Language switcher implemented and working. Upgrade/Cancel Pro subscription flow implemented and tested end-to-end (checkout, webhook, in-app cancellation, and direct-in-Stripe cancellation). Reading progress now syncs to Supabase for logged-in users (cross-device), tested and confirmed working. `/api/retell` and `/api/format` migrated off Vercel to a standalone server on Railway, tested end-to-end in production with large books. Monthly/per-file character limits reworked (1M → 2M, plus a one-time "grace pass" and a hard per-file cap) — see DOCS.md Section 16 for the cost reasoning.
 
----
-
-## IN PROGRESS — next steps for new chat
-
-**Task: Add Upgrade/Cancel Pro buttons to /account**
-
-Confirmed requirements:
-1. "Upgrade to read your texts" button → opens Stripe Checkout for Pro plan directly (not just link to /pricing)
-2. "Cancel Pro account" button → cancels subscription via Stripe API (`stripe.subscriptions.cancel`)
-3. Buttons are conditional: "Upgrade" shown only to `plan=free` users, "Cancel Pro" shown only to `plan=pro` users
-
-**Completed so far:**
-- Added `stripe_subscription_id` column to `profiles` table (SQL executed)
-
-**Still needed:**
-1. Update `app/api/stripe/webhook/route.ts` — save `subscription.id` to `profiles.stripe_subscription_id` when `checkout.session.completed` fires with `mode=subscription`
-2. Create new API route `app/api/stripe/cancel/route.ts` — calls `stripe.subscriptions.cancel(subscriptionId)`, then updates `profiles.plan = 'free'`
-3. Update `app/account/page.tsx` UI — add conditional buttons based on `profile.plan`:
-   - Free: "Upgrade to read your texts" → calls checkout with Pro price ID (same flow as pricing page)
-   - Pro: "Cancel Pro account" → calls new cancel API route, with confirm dialog
-4. Mockup reference: buttons appear next to the Email display box on `/account`, black button for upgrade, underlined text link for cancel
+Full UI internationalization is intentionally postponed — interface stays English-only for now. PWA is planned as the final step, after all other plan items are done.
 
 ---
 
@@ -75,13 +55,53 @@ Confirmed requirements:
 - Auto-trigger: creates profile on user registration (`handle_new_user` function, includes email now)
 - Pro paywall on upload: `NEXT_PUBLIC_PRO_REQUIRED` env variable
 - 100 card limit for free users
-- Monthly character limit: 1,000,000 chars/month for Pro, resets after 30 days
+- Monthly character limit: 2,000,000 chars/month for Pro, resets after 30 days
+- Hard per-file cap: no single upload may exceed 2,000,000 characters, regardless of remaining quota
+- "Grace pass": if a file first pushes a user over their monthly quota (and they hadn't already exceeded it), the upload is still processed for free, once per period — see DOCS.md Section 16 for the cost reasoning behind these numbers
 - Stripe integration: checkout + webhook, production webhook on Vercel
 - Pricing page `/pricing` with Free / Pro / Donate
 - Admin identification via `NEXT_PUBLIC_ADMIN_EMAIL`
 - Admin book upload interface at `/admin` with cover image upload
 - Public library from Supabase (`is_public` + `status=done`)
 - `created_at` bug fixed
+
+### Subscription management — Upgrade/Cancel Pro ✅
+- `stripe_subscription_id` column added to `profiles`
+- `app/api/stripe/checkout/route.ts` — added `subscription_data: { metadata: { userId } }` so the *subscription* itself (not just the checkout session) carries `userId`; required for subscription-level webhook events (e.g. cancellations initiated directly in Stripe) to identify the user
+- `app/api/stripe/webhook/route.ts`:
+  - `checkout.session.completed` (mode=subscription) now also saves `stripe_subscription_id` on the profile, alongside setting `plan='pro'`
+  - `customer.subscription.deleted` resets `profiles.plan = 'free'` — covers both in-app cancellation and cancellation done directly in the Stripe dashboard
+- New route `app/api/stripe/cancel/route.ts` — calls `stripe.subscriptions.cancel()`, then sets `profiles.plan = 'free'`, `stripe_subscription_id = null`
+- `app/account/page.tsx` — conditional buttons in the same row as the email box:
+  - Free plan: "Upgrade to read your texts" (black button) → Stripe Checkout
+  - Pro plan: "Cancel Pro account" (underlined text link) → confirm dialog → cancel API → alert feedback
+- Tested end-to-end locally with Stripe CLI (`stripe listen`), including test card `4242 4242 4242 4242`: upgrade, in-app cancel, and direct-in-Stripe cancel all correctly sync `profiles.plan`
+
+### Reading progress sync ✅
+- New Supabase table `reading_progress`: composite primary key `(user_id, book_id)`, columns `page`, `updated_at`; RLS policy restricts each user to their own rows
+- Applies to both `app/reader/[id]/page.tsx` (public books) and `app/account/reader/[id]/page.tsx` (user books)
+- Logged-out users on public books: `localStorage` only, no sync (no `user_id` to attach progress to)
+- Logged-in users: `localStorage` acts as a fast local cache (instant page restore on load, works offline); Supabase is the cross-device source of truth
+- On book load: read `localStorage` first for instant display, then fetch from `reading_progress` in the background — if a saved page exists there, it overrides the local value and updates `localStorage` (handles reading the same book from a different device/browser)
+- On page change: write to `localStorage` immediately, and `upsert` to `reading_progress` in the background (`onConflict: 'user_id,book_id'`) — not awaited, so page navigation isn't blocked by the network call
+- No one-time migration of pre-existing `localStorage` progress into Supabase — sync simply starts fresh from the first page change after deploy
+- Tested manually: progress carries over correctly when switching browsers / closing and reopening a book while logged in
+
+### Processing server migration (Railway) ✅
+- `/api/retell` and `/api/format` moved off Vercel entirely, to a standalone Node/Express server in a separate repo (`balaka-processing`, hosted on Railway, Hobby plan $5/mo) — removes Vercel's serverless execution time limit for large books (see DOCS.md Section 14 for the original problem, Section 16a for full technical detail)
+- Authentication changed from a client-supplied `userId` in the request body to real verification of the user's Supabase session token (`Authorization: Bearer <token>`, checked server-side via `supabase.auth.getUser()`) — closes a previously-known trust gap
+- New shared frontend helper `lib/processing.ts` (`callProcessingApi`) used by `admin/page.tsx`, `page.tsx`, and `account/page.tsx` instead of calling `fetch('/api/retell'|'/api/format', ...)` directly
+- Fixed a real production issue: Railway's public-networking proxy has a 60-second idle keep-alive timeout, which was cutting off the original design (browser waits for one big response at the very end of processing). Both endpoints now respond immediately once the job is validated and marked "processing," then do the actual chunk-by-chunk Claude work as a background task — progress is still tracked via `books.progress` and picked up by the existing polling on `/account`, unchanged
+- Added an in-memory `jobsInProgress` guard on the server to reject a second concurrent request for the same book (`409`), preventing duplicate jobs from racing on the same book's progress field
+- Removed the automatic background `/api/format` call that used to fire immediately on every regular-user upload — uploads now just insert the book as `pending`; the actual processing (format or retell) only starts once the user explicitly picks "Read original" or "Create retelling" on `/account`. Saves API cost on uploads nobody follows through on, and eliminates a race where auto-format and a manually-requested retelling could collide on the same book
+- `handleReadOriginal` on `/account` now actually calls `/api/format` (previously it skipped formatting entirely and just marked the book done with the raw, unformatted text) — the existing generic progress bar (tied to `status === 'processing'`, not to book type) picks this up automatically, no separate UI work needed
+- Old `/api/retell` and `/api/format` routes are still present in the Vercel codebase but unused — kept temporarily as a rollback safety net, not called from anywhere in the frontend anymore
+
+### Character limit refinement ✅
+- Monthly Pro quota raised from 1,000,000 to 2,000,000 characters
+- New hard per-file cap: no single upload may exceed 2,000,000 characters, checked before any quota logic, regardless of plan or remaining quota
+- New "grace pass": the first upload in a period that pushes a user over their monthly quota is still processed for free (message: "You have reached your monthly limit of 2,000,000 characters. Anyway, we will finish this task for you for free.") — any further attempt once already over quota is hard-blocked as before
+- Numbers chosen based on actual Claude Haiku 4.5 API pricing worked out from a worst-case single-file cost estimate — see DOCS.md Section 16 for the full math and the caveat that this doesn't by itself confirm overall Pro-tier profitability (translation-lookup volume during reading is the bigger unknown)
 
 ### UI/UX improvements ✅
 - Book grid with 2:3 aspect ratio covers, colored placeholders (`book.id.charCodeAt(0) % COVER_COLORS.length`)
@@ -117,7 +137,7 @@ Confirmed requirements:
 | Plan | Price | Features |
 |------|-------|----------|
 | Free | $0 | Read library books, save up to 100 cards |
-| Pro | $4.99/mo | Upload texts, retelling, epub/txt/pdf, export cards, unlimited cards, 1M chars/month |
+| Pro | $4.99/mo | Upload texts, retelling, epub/txt/pdf, export cards, unlimited cards, 2M chars/month |
 | Donate | Any | One-time via Stripe |
 
 ---
@@ -129,7 +149,7 @@ app/
   page.tsx                        # Main page: upload + public library (filtered by learning_language)
   layout.tsx                      # Root layout: Header + Footer
   auth/page.tsx
-  account/page.tsx                # My books (grid) + my cards; NEEDS: upgrade/cancel pro buttons
+  account/page.tsx                # My books (grid) + my cards; Upgrade/Cancel Pro buttons next to email
   account/reader/[id]/page.tsx    # User book reader (retelling_text || original_text)
   account/reader/[id]/layout.tsx
   reader/[id]/page.tsx            # Public book reader — reads retelling_text || original_text
@@ -144,9 +164,9 @@ app/
     retell/route.ts               # Chunk-based retelling, enforceMaxSentencesPerParagraph
     format/route.ts               # Chunk-based original text formatting, same paragraph enforcement
     stripe/
-      checkout/route.ts           # Stripe init inside POST (not module level!)
-      webhook/route.ts            # Stripe init inside POST; NEEDS: save subscription_id
-      cancel/route.ts             # NOT YET CREATED — needed for cancel flow
+      checkout/route.ts           # Stripe init inside POST; subscription_data.metadata.userId set
+      webhook/route.ts            # Stripe init inside POST; saves subscription_id, handles subscription.deleted
+      cancel/route.ts             # Cancels subscription via Stripe API, resets plan to free
   components/
     Reader.tsx                    # Shared reader, passes nativeLanguage + learningLanguage to translate API
     Header.tsx                    # Language switcher with LanguageDropdown component
@@ -203,7 +223,17 @@ DOCS.md
 | native_language | text | default 'ru' |
 | learning_language | text | default 'en' |
 | email | text | populated by trigger on signup; backfilled manually for old accounts |
-| stripe_subscription_id | text | NEW — added for cancel flow, not yet populated by webhook |
+| stripe_subscription_id | text | populated by webhook on subscription checkout; cleared to null on cancellation (in-app or direct-in-Stripe) |
+
+### `reading_progress`
+| Column | Type | Notes |
+|--------|------|-------|
+| user_id | uuid | → auth.users, part of composite PK |
+| book_id | uuid | → books, part of composite PK |
+| page | integer | default 1 |
+| updated_at | timestamptz | default now() |
+
+Primary key: `(user_id, book_id)` — enables `upsert` on page change instead of manual existence checks. RLS: users manage only their own rows.
 
 ### Views (read-only, for easier moderation in Supabase dashboard)
 - `books_admin_view` — books where `user_id = admin's uuid` (WITH security_invoker=true)
@@ -233,7 +263,10 @@ STRIPE_WEBHOOK_SECRET
 NEXT_PUBLIC_APP_URL
 NEXT_PUBLIC_PRO_REQUIRED
 NEXT_PUBLIC_ADMIN_EMAIL
+NEXT_PUBLIC_PROCESSING_API_URL
 ```
+
+Separately, the `balaka-processing` repo on Railway has its own env vars (`ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `FRONTEND_URL`) — see DOCS.md Section 16a.
 
 ---
 
@@ -245,6 +278,8 @@ NEXT_PUBLIC_ADMIN_EMAIL
 - **Retelling target length:** 50-70% of original (not just "not below 70%" — needed explicit upper bound too).
 - **Format vs Retell:** format.md preserves ALL content, just improves readability. retell.md simplifies language and shortens to 50-70%.
 - **Stripe init:** must be inside route handler functions, not module level (Vercel build fails otherwise).
+- **Stripe subscription metadata:** `userId` must be set on the *subscription* via `subscription_data.metadata` at checkout creation time, not only on the checkout session's own `metadata`. Subscription-level webhook events (like `customer.subscription.deleted`, which fires on cancellations made directly in the Stripe dashboard) only carry the subscription's own metadata — without this, those events can't be tied back to a user.
+- **Stripe webhook testing:** requires `stripe listen --forward-to localhost:3000/api/stripe/webhook` running in a separate terminal during local testing — without it, Checkout still completes and redirects successfully, but no webhook event ever reaches localhost, so `profiles.plan` silently never updates. Easy to miss since the checkout flow itself appears to succeed.
 - **Public reader bug (fixed):** `/reader/[id]/page.tsx` was only reading `original_text`, ignoring `retelling_text` entirely — always check both readers use `retelling_text || original_text`.
 - **Translation language:** fully dynamic now — `nativeLanguage` (translation target) and `learningLanguage` (source text language, affects examples + verb forms) both read from localStorage and passed to `/api/translate`.
 - **Language lists must stay in sync:** `Header.tsx` (LEARNING_LANGUAGES, NATIVE_LANGUAGES) and `app/api/translate/route.ts` (LANGUAGE_NAMES) need matching codes or translation breaks silently (falls back to Russian/English).
@@ -258,16 +293,18 @@ NEXT_PUBLIC_ADMIN_EMAIL
 - Double-click word selection captures trailing space — workaround: use click+drag
 - epub upload not implemented
 - Hydration warning in console — cosmetic
+- Old `/api/retell` and `/api/format` routes still exist in the Vercel codebase but are unused (superseded by the Railway server) — safe to delete once the migration has proven stable for a while; kept for now as a rollback safety net
+- `/api/stripe/cancel` still trusts `userId` from the request body rather than verifying the session server-side — unlike the new Railway processing server, this route wasn't touched during the migration and still has the same trust gap noted previously; worth revisiting if stricter auth is needed later
 
 ---
 
 ## Possible improvements (deferred)
 
 ### High priority
-- Reading progress sync to Supabase (currently localStorage only, device-specific)
-- Full UI internationalization (interface strings currently English-only regardless of native_language)
 - epub/pdf upload support
-- Migrate heavy processing (retell/format) to Railway/Render when scaling — Vercel time limits won't hold at scale
+
+### Postponed (intentionally deferred, not a priority right now)
+- Full UI internationalization (interface strings currently English-only regardless of native_language) — too much code to justify right now
 
 ### Medium priority
 - Card categories by source book
@@ -283,4 +320,3 @@ NEXT_PUBLIC_ADMIN_EMAIL
 - PWA / mobile app
 - Reading mode for visually impaired
 - Audio retelling
-

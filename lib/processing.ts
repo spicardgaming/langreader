@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 const PROCESSING_API_URL = process.env.NEXT_PUBLIC_PROCESSING_API_URL;
 
 export async function callProcessingApi(
-  endpoint: "retell" | "format",
+  endpoint: "retell" | "format" | "extract",
   bookId: string
 ): Promise<Response> {
   const {

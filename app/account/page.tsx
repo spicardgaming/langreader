@@ -18,10 +18,11 @@ type Card = {
 type Book = {
   id: string;
   title: string;
-  status: "pending" | "processing" | "done" | "error";
+  status: "pending" | "extracting" | "processing" | "done" | "error";
   type: "original" | "retelling";
   created_at: string;
   progress: number;
+  source_path?: string | null;
 };
 
 function ChevronIcon({ up }: { up: boolean }) {
@@ -116,7 +117,7 @@ export default function AccountPage() {
 
  
     useEffect(() => {
-    const hasProcessing = books.some(b => b.status === 'processing');
+    const hasProcessing = books.some(b => b.status === 'processing' || b.status === 'extracting');
     if (!hasProcessing || !userId) return;
 
     const interval = setInterval(async () => {
@@ -196,6 +197,39 @@ export default function AccountPage() {
       )
     );
     callProcessingApi('format', bookId);
+  };
+
+  const handleRetryExtraction = async (bookId: string) => {
+    if (!userId) return;
+
+    setBooks(prevBooks =>
+      prevBooks.map(book =>
+        book.id === bookId ? { ...book, status: 'extracting' as const } : book
+      )
+    );
+
+    try {
+      const response = await callProcessingApi('extract', bookId);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to extract text');
+      }
+
+      if (result.grace) {
+        alert('You have reached your monthly limit of 2,000,000 characters. Anyway, we will finish this task for you for free.');
+      }
+
+      await loadBooks();
+    } catch (error) {
+      console.error('Error extracting text:', error);
+      setBooks(prevBooks =>
+        prevBooks.map(book =>
+          book.id === bookId ? { ...book, status: 'error' as const } : book
+        )
+      );
+      alert('Error, try again');
+    }
   };
 
 const handleReadOriginal = async (bookId: string) => {
@@ -424,6 +458,13 @@ const handleReadOriginal = async (bookId: string) => {
                         </div>
                       )}
 
+                      {book.status === 'extracting' && (
+                        <>
+                          <span className="text-xs text-[#78716c]">Extracting text...</span>
+                          <span className="text-[10px] text-[#a8a29e] leading-snug">This only takes a moment.</span>
+                        </>
+                      )}
+
                       {book.status === 'processing' && (
                         <>
                           <span className="text-xs text-[#78716c]">{(book.progress ?? 0) > 0 ? `Processing... ${book.progress}%` : 'Processing...'}</span>
@@ -438,7 +479,9 @@ const handleReadOriginal = async (bookId: string) => {
                       {book.status === 'error' && (
   <div className="flex flex-col gap-1">
     <span className="text-xs font-medium text-[#dc2626]">Error</span>
-    {book.type === 'original' ? (
+    {book.source_path ? (
+      <button onClick={() => handleRetryExtraction(book.id)} className="rounded bg-[#dc2626] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full">Retry extraction</button>
+    ) : book.type === 'original' ? (
       <button onClick={() => handleRetryFormat(book.id)} className="rounded bg-[#dc2626] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full">Retry formatting</button>
     ) : (
       <button onClick={() => handleRetry(book.id)} className="rounded bg-[#dc2626] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full">Retry</button>

@@ -71,7 +71,7 @@ export default function Home() {
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
-    
+
     if (file.name.endsWith('.txt')) {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -80,7 +80,7 @@ export default function Home() {
       };
       reader.readAsText(file);
     } else if (file.name.endsWith('.epub')) {
-      setFileContent("epub support coming soon");
+      setFileContent('epub');
     }
   };
 
@@ -131,14 +131,21 @@ export default function Home() {
       return;
     }
 
+    const isEpub = selectedFile.name.endsWith('.epub');
+
+    if (isEpub && selectedFile.size > 20 * 1024 * 1024) {
+      setUploadMessage('Files must be under 20MB.');
+      return;
+    }
+
     // Hard cap: no single file may exceed 2,000,000 characters, regardless of plan or remaining quota
-    if (fileContent.length > 2000000) {
+    if (!isEpub && fileContent.length > 2000000) {
       setUploadMessage('toolarge');
       return;
     }
 
     // Check if Pro subscription is required
-    if (process.env.NEXT_PUBLIC_PRO_REQUIRED === 'true') {
+    if (!isEpub && process.env.NEXT_PUBLIC_PRO_REQUIRED === 'true') {
       // Get user profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -229,12 +236,77 @@ export default function Home() {
       }
     }
 
-    // Save to database
     const title = selectedFile.name.replace(/\.(txt|epub)$/, '');
-    
-    // Calculate text hash for duplicate detection
+
+    if (isEpub) {
+      const { data: bookData, error } = await supabase
+        .from('books')
+        .insert({
+          user_id: session.user.id,
+          title: title,
+          original_text: '',
+          text_hash: '',
+          type: 'original',
+          status: 'extracting',
+          language: 'en'
+        })
+        .select()
+        .single();
+
+      if (error || !bookData) {
+        console.error('Error saving book:', error);
+        setUploadMessage('Error uploading file.');
+        return;
+      }
+
+      const sourcePath = `${session.user.id}/${bookData.id}.epub`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('book-sources')
+        .upload(sourcePath, selectedFile, { contentType: 'application/epub+zip' });
+
+      if (uploadError) {
+        console.error('Error uploading source file:', uploadError);
+        await supabase.from('books').update({ status: 'error' }).eq('id', bookData.id);
+        setUploadMessage('Error uploading file.');
+        return;
+      }
+
+      const { error: pathUpdateError } = await supabase
+        .from('books')
+        .update({ source_path: sourcePath })
+        .eq('id', bookData.id);
+
+      if (pathUpdateError) {
+        console.error('Error saving source path:', pathUpdateError);
+        setUploadMessage('Error uploading file.');
+        return;
+      }
+
+      try {
+        const response = await callProcessingApi('extract', bookData.id);
+        const result = await response.json();
+
+        if (!response.ok) {
+          setUploadMessage(result.error || 'Failed to extract text from file.');
+          return;
+        }
+
+        if (result.grace) {
+          window.alert('You have reached your monthly limit of 2,000,000 characters. Anyway, we will finish this task for you for free.');
+        }
+      } catch (err) {
+        console.error('Extraction request failed:', err);
+        setUploadMessage('Error uploading file.');
+        return;
+      }
+
+      router.push('/account');
+      return;
+    }
+
     const textHash = btoa(encodeURIComponent(fileContent.slice(0, 200))).slice(0, 50) + fileContent.length;
-    
+
     const { data: bookData, error } = await supabase
       .from('books')
       .insert({
@@ -285,15 +357,9 @@ export default function Home() {
                     <p className="text-sm leading-relaxed text-[#1a1a1a] sm:text-base font-medium">
                       {selectedFile.name}
                     </p>
-                    {fileContent === "epub support coming soon" ? (
-                      <p className="mt-2 text-xs text-[#a8a29e]">
-                        epub support coming soon
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-xs text-[#a8a29e]">
-                        Ready to upload
-                      </p>
-                    )}
+                    <p className="mt-2 text-xs text-[#a8a29e]">
+                      Ready to upload
+                    </p>
                   </>
                 ) : (
                   <>
@@ -311,7 +377,7 @@ export default function Home() {
                 onClick={handleUpload}
                 className="flex h-12 w-12 shrink-0 items-center justify-center self-center rounded-full bg-[#2c2c2c] text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                 aria-label="Загрузить файл"
-                disabled={!selectedFile || fileContent === "epub support coming soon"}
+                disabled={!selectedFile}
               >
                 <ArrowIcon />
               </button>

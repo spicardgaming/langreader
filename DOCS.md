@@ -28,6 +28,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_PRO_REQUIRED=false
 NEXT_PUBLIC_ADMIN_EMAIL=your@email.com
+NEXT_PUBLIC_PROCESSING_API_URL=https://balaka-processing-production.up.railway.app
 ```
 
 ```bash
@@ -49,15 +50,17 @@ git push
 All env vars from `.env.local` must also be in Vercel → Settings → Environment Variables.
 `STRIPE_WEBHOOK_SECRET` in Vercel = production webhook secret (different from local CLI secret).
 
+The `/api/retell` and `/api/format` processing itself no longer runs on Vercel — see Section 16a for the separate `balaka-processing` repo/deployment on Railway.
+
 ---
 
 ## 3. Adding a book to the public library
 
-**Always upload locally** (`localhost:3000/admin`), not via `langreader.vercel.app/admin` — see Section 14 for why.
+**Always upload locally** (`localhost:3000/admin`), not via `langreader.vercel.app/admin` — see Section 14 for why this historically mattered; the processing itself now runs on Railway regardless (Section 16a), which removes the original timeout concern, but local upload is still the established habit for the admin library.
 
 1. Log in as admin, go to `localhost:3000/admin`
 2. Fill: title, language, type (Original = readability formatting only / Retelling = Claude simplifies), optional cover image
-3. Upload `.txt` → wait for processing to finish locally (progress shown in account)
+3. Upload `.txt` → wait for processing to finish (progress shown in account)
 4. Supabase → `books` table → set `is_public = true` on that row
 5. Book appears on main page (filtered by `learning_language` for each user)
 
@@ -106,6 +109,10 @@ Test card: `4242 4242 4242 4242`, any future date/CVC.
 
 Re-auth (every 90 days): `.\stripe.exe login`
 
+**Important:** `stripe listen` must be running in its own terminal for the *entire* duration of any local Stripe test. If it isn't running, Checkout still completes and redirects successfully on the surface, but no webhook event ever reaches localhost — so `profiles.plan` silently never updates. Easy to miss since nothing visibly errors.
+
+For subscriptions specifically: `checkout/route.ts` sets `subscription_data.metadata.userId` (not just the checkout session's own `metadata`) — this is required so that subscription-level events like `customer.subscription.deleted` (fired when a subscription is cancelled directly in the Stripe dashboard, not just via the app's own cancel button) can still be tied back to a user.
+
 ---
 
 ## 7. Toggling Pro paywall
@@ -123,6 +130,8 @@ Manual redeploy needed after changing.
 Edit directly, no code changes:
 - `lib/prompts/retell.md` — simplification/retelling rules
 - `lib/prompts/format.md` — readability formatting rules (no content change)
+
+These files also need to be manually kept in sync in the separate `balaka-processing` repo (Section 16a) — they are not shared/imported between the two repos, just copy-pasted.
 
 ```bash
 git add . && git commit -m "update prompt" && git push
@@ -156,6 +165,7 @@ To add a learning language: confirm books exist in that language first, then unc
 | `profiles` | User settings/plan |
 | `profiles_free_view` | Read-only: free users |
 | `profiles_pro_view` | Read-only: pro users |
+| `reading_progress` | Cross-device reading progress, composite PK `(user_id, book_id)` |
 
 Views use `WITH (security_invoker = true)` — required to avoid Supabase security linter warnings. Do NOT use subqueries to `auth.users` inside views (also flagged as security risk) — hardcode the admin UUID instead.
 
@@ -172,7 +182,7 @@ Bucket `covers` — public, admin-only uploads via `/admin` form. URL stored in 
 
 ## 12. Reading progress
 
-localStorage key: `reading_progress_${bookId}` → page number. Device-specific, not synced (see SNAPSHOT.md Possible Improvements).
+Synced to Supabase (`reading_progress` table) for logged-in users, with `localStorage` (key `reading_progress_${bookId}` → page number) acting as a fast local cache. Logged-out users on public books remain `localStorage`-only (no `user_id` to attach progress to). See SNAPSHOT.md "Reading progress sync" section for the full design.
 
 ---
 
@@ -188,23 +198,16 @@ When adding new languages, update `LANGUAGE_NAMES` map in `app/api/translate/rou
 
 ---
 
-## 14. Uploading large books — Vercel timeout issue
+## 14. Uploading large books — historical Vercel timeout issue (resolved)
 
-### Problem
-Vercel serverless functions have execution time limits. Books over ~200KB may time out mid-processing on `langreader.vercel.app`, leaving `status = processing` stuck with a partial `progress` value that never updates.
+### The original problem
+Vercel serverless functions have execution time limits. Books over ~200KB used to time out mid-processing on `langreader.vercel.app`, leaving `status = processing` stuck with a partial `progress` value that never updated.
 
-### Solution: upload locally
-1. `npm run dev`
-2. Go to `localhost:3000/admin`
-3. Upload — no time limit locally
-4. Book saves to Supabase (cloud) — safe to shut down PC after
-5. Set `is_public = true` in Supabase to publish
+### Resolution
+As of the Railway migration (Section 16a), `/api/retell` and `/api/format` no longer run on Vercel at all — they run on a separate long-running Node server on Railway, called directly from the browser. Vercel's execution time limit no longer applies to this workflow. Large books (200KB+) have been tested end-to-end in production and complete successfully.
 
 ### If a book gets stuck anyway
 Supabase → `books` → set `status = error` → user/admin clicks "Retry" or "Retry formatting" button in `/account`.
-
-### Future fix
-Migrate `/api/retell` and `/api/format` to a dedicated server (Railway/Render, ~$5-20/mo) when scaling — removes the time limit entirely. Keep Vercel for the frontend.
 
 ---
 
@@ -215,4 +218,79 @@ Both `/api/retell` and `/api/format` apply `enforceMaxSentencesPerParagraph()` �
 This exists because prompt instructions alone ("break long paragraphs") are unreliable for certain text types (e.g. long uninterrupted dialogue monologues) — Claude sometimes ignores the instruction. Code-level enforcement is deterministic, adds no extra API cost, and guarantees the rule is followed.
 
 Limits: 6 sentences for format.md (original), 5 sentences for retell.md (retelling).
+
+---
+
+## 16. Character limits & cost economics
+
+### The numbers
+- **Per-file hard cap:** no single upload may exceed **2,000,000 characters**, regardless of plan or remaining monthly quota. This check happens first, before any quota logic, and applies unconditionally.
+- **Monthly Pro quota:** **2,000,000 characters/month**, tracked via `profiles.chars_used`, resetting every 30 days from `profiles.period_start`.
+- **"Grace pass":** if a single upload is the *first* one in the current period to push the user over their monthly quota (i.e. `chars_used` was still under 2,000,000 before this upload), the upload is still processed for free — the person sees "You have reached your monthly limit of 2,000,000 characters. Anyway, we will finish this task for you for free." Any *further* upload attempt in the same period, once `chars_used` is already over 2,000,000, is hard-blocked with the standard limit message — no further grace.
+- Because the per-file cap and the monthly quota are the same number (2,000,000), a single file can never itself jump from "under quota" to "wildly over quota" — the worst case for the grace pass is bounded to roughly one extra file's worth of quota overage, at most once per 30-day period per account.
+
+### Why these specific numbers
+Worked out from Claude Haiku 4.5 API pricing (`$1/million input tokens`, `$5/million output tokens`, checked live rather than assumed, since rates change over time) and the app's chunking behavior (12,000 characters per chunk, ≈ 1 token per 4 characters as a rough estimate for Latin-script text):
+
+For a 2,000,000-character file (~167 chunks):
+- **Format** (worst case — output is roughly the same size as input, since formatting doesn't shorten content):
+  - Input: ~600,000 tokens × $1/M ≈ **$0.60**
+  - Output: ~500,000 tokens × $5/M ≈ **$2.50**
+  - **Total ≈ $3.10** for one full-size file
+- **Retell** (cheaper — output is 50-70% of input length by design, see Section 15):
+  - **Total ≈ $2.10** for one full-size file
+
+Against $4.99/month Pro revenue, even the worst case (one grace-pass format job at max size) leaves roughly $2 of margin before Stripe fees (~$0.45), shared hosting costs (Vercel/Supabase/Railway), and — importantly — the **recurring, harder-to-predict cost of in-reader translation lookups** (`/api/translate`, also Claude Haiku), which isn't captured in this file-processing estimate at all and depends on how much an individual user actually reads and looks up month to month.
+
+**Bottom line:** the 2,000,000 character limits are safely bounded on their own, but they don't by themselves confirm overall Pro-tier profitability — that depends more on translation-lookup volume per active reader. Worth checking real per-user cost in the Anthropic Console usage dashboard after this has been live for a while, and revisiting the quota if needed.
+
+---
+
+## 16a. Processing server (Railway) — `balaka-processing`
+
+`/api/retell` and `/api/format` were migrated off Vercel to a separate, standalone Node/Express server, to remove Vercel's serverless execution time limit for large books (Section 14).
+
+### Repository
+Separate GitHub repo: `balaka-processing` (private). Not a subfolder of `langreader` — kept independent so Vercel doesn't try to build/deploy it, and so Railway has a clean single-purpose repo to deploy from.
+
+```
+balaka-processing/
+├── package.json       (express, cors, @supabase/supabase-js)
+├── server.js           (both endpoints, all processing logic)
+├── .env.example
+└── lib/
+    └── prompts/
+        ├── retell.md    (must be manually kept in sync with the main repo's copy)
+        └── format.md    (same)
+```
+
+### Hosting
+Railway, Hobby plan ($5/mo — the free trial's credit-based limits and possible sleep/stop behavior weren't reliable enough for production use). Public domain auto-generated by Railway: `https://balaka-processing-production.up.railway.app`.
+
+### Environment variables (set in Railway → Variables, not `.env.local`)
+```
+ANTHROPIC_API_KEY
+SUPABASE_URL                  (same value as NEXT_PUBLIC_SUPABASE_URL on Vercel)
+SUPABASE_ANON_KEY             (same value as NEXT_PUBLIC_SUPABASE_ANON_KEY on Vercel)
+SUPABASE_SERVICE_ROLE_KEY
+FRONTEND_URL                  (comma-separated list of allowed origins for CORS, e.g.
+                                http://localhost:3000,https://langreader.vercel.app,https://balaka.app)
+PORT                          (Railway sets this automatically)
+```
+**When the custom domain changes or is added, `FRONTEND_URL` must be updated** with the new origin, or the browser's CORS preflight will block requests from that domain.
+
+### Authentication model
+The processing server does **not** trust a `userId` field in the request body (unlike the original Vercel routes). Instead, the frontend sends the user's real Supabase session token in the `Authorization: Bearer <token>` header; the server verifies it via `supabase.auth.getUser(token)` and derives the user id itself. This closes the previously-known gap where `/api/retell` and `/api/format` trusted a client-supplied `userId` at face value.
+
+On the frontend, all calls go through a shared helper, `lib/processing.ts` → `callProcessingApi(endpoint, bookId)`, which reads the current session and attaches the token automatically. `app/admin/page.tsx`, `app/page.tsx`, and `app/account/page.tsx` all use this helper instead of calling `fetch('/api/retell'|'/api/format', ...)` directly.
+
+### Critical: Railway's 60-second idle connection timeout
+Railway's public-networking proxy has a **Keep-Alive idle timeout of 60 seconds** — if an HTTP connection sits with no bytes flowing for 60+ seconds, the proxy closes it from its side, even though Railway's own documented *maximum* request duration is much longer (15 minutes) and the Node process itself keeps running uninterrupted server-side.
+
+This mattered here because the original design had the browser's `fetch()` call block and wait for a single JSON response only once the *entire* chunk-processing loop finished — for any book taking longer than ~60 seconds, the browser would see a network error (and any local retry logic could then race a second, duplicate processing job against the first, corrupting `books.progress`), even though the server had not actually failed and kept working in the background.
+
+**Fix:** both `/api/retell` and `/api/format` now validate the request (auth, book ownory, quota) and mark `status = 'processing'` synchronously, respond to the browser immediately (typically well under a second), and only *then* kick off the actual chunk-by-chunk Claude processing loop as a fire-and-forget background task. Progress is still written to `books.progress` exactly as before, and the existing polling on `/account` (every 10s) picks it up — no frontend changes were needed for this part. An in-memory `jobsInProgress` Set on the server also rejects (`409`) a second request for a book that's already being processed, to prevent duplicate concurrent jobs from ever starting in the first place.
+
+### Local testing
+Since `admin/page.tsx`, `page.tsx`, and `account/page.tsx` all call the Railway URL directly (not a local `/api/...` route), testing locally via `npm run dev` on `localhost:3000` exercises the *real* Railway server — there is no separate "local mode" for the processing server itself. This is useful: bugs in the Railway server's behavior (e.g. the idle-timeout issue above) reproduce identically whether the frontend is opened from `localhost:3000` or `langreader.vercel.app`, since the Railway server is the same either way. Vercel-specific issues (e.g. the old serverless timeout) do *not* reproduce locally, since `npm run dev` has no execution time limit of its own — those specifically require testing against the deployed `langreader.vercel.app`.
 
