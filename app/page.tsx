@@ -79,8 +79,9 @@ export default function Home() {
         setFileContent(content);
       };
       reader.readAsText(file);
-    } else if (file.name.endsWith('.epub')) {
-      setFileContent('epub');
+    } else if (file.name.endsWith('.epub') || file.name.endsWith('.pdf')) {
+      // Text isn't known yet — it gets extracted server-side after upload.
+      setFileContent('binary');
     }
   };
 
@@ -110,7 +111,7 @@ export default function Home() {
     setIsDragging(false);
     
     const file = e.dataTransfer.files?.[0];
-    if (file && (file.name.endsWith('.txt') || file.name.endsWith('.epub'))) {
+    if (file && (file.name.endsWith('.txt') || file.name.endsWith('.epub') || file.name.endsWith('.pdf'))) {
       handleFileSelect(file);
     }
   };
@@ -131,21 +132,21 @@ export default function Home() {
       return;
     }
 
-    const isEpub = selectedFile.name.endsWith('.epub');
+    const needsExtraction = selectedFile.name.endsWith('.epub') || selectedFile.name.endsWith('.pdf');
 
-    if (isEpub && selectedFile.size > 20 * 1024 * 1024) {
+    if (needsExtraction && selectedFile.size > 20 * 1024 * 1024) {
       setUploadMessage('Files must be under 20MB.');
       return;
     }
 
     // Hard cap: no single file may exceed 2,000,000 characters, regardless of plan or remaining quota
-    if (!isEpub && fileContent.length > 2000000) {
+    if (!needsExtraction && fileContent.length > 2000000) {
       setUploadMessage('toolarge');
       return;
     }
 
     // Check if Pro subscription is required
-    if (!isEpub && process.env.NEXT_PUBLIC_PRO_REQUIRED === 'true') {
+    if (!needsExtraction && process.env.NEXT_PUBLIC_PRO_REQUIRED === 'true') {
       // Get user profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -236,9 +237,9 @@ export default function Home() {
       }
     }
 
-    const title = selectedFile.name.replace(/\.(txt|epub)$/, '');
+    const title = selectedFile.name.replace(/\.(txt|epub|pdf)$/, '');
 
-    if (isEpub) {
+    if (needsExtraction) {
       const { data: bookData, error } = await supabase
         .from('books')
         .insert({
@@ -259,11 +260,13 @@ export default function Home() {
         return;
       }
 
-      const sourcePath = `${session.user.id}/${bookData.id}.epub`;
+      const fileExtension = selectedFile.name.endsWith('.pdf') ? 'pdf' : 'epub';
+      const contentType = fileExtension === 'pdf' ? 'application/pdf' : 'application/epub+zip';
+      const sourcePath = `${session.user.id}/${bookData.id}.${fileExtension}`;
 
       const { error: uploadError } = await supabase.storage
         .from('book-sources')
-        .upload(sourcePath, selectedFile, { contentType: 'application/epub+zip' });
+        .upload(sourcePath, selectedFile, { contentType });
 
       if (uploadError) {
         console.error('Error uploading source file:', uploadError);
@@ -337,7 +340,7 @@ export default function Home() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".txt,.epub"
+                accept=".txt,.epub,.pdf"
                 onChange={handleFileInputChange}
                 className="hidden"
               />
@@ -367,7 +370,7 @@ export default function Home() {
                       Drop a file here or click to select
                     </p>
                     <p className="mt-2 text-xs text-[#a8a29e]">
-                      Supported formats: .txt, .epub
+                      Supported formats: .txt, .epub, .pdf
                     </p>
                   </>
                 )}

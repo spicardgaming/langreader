@@ -178,6 +178,8 @@ Views use `WITH (security_invoker = true)` — required to avoid Supabase securi
 
 Bucket `covers` — public, admin-only uploads via `/admin` form. URL stored in `books.cover_url`.
 
+Bucket `book-sources` — private, RLS-scoped so each user can only access files under their own `${userId}/...` path prefix. Holds raw uploaded epub files before extraction; downloaded by the Railway processing server using its service-role key (no signed URL needed). See Section 16b.
+
 ---
 
 ## 12. Reading progress
@@ -293,4 +295,37 @@ This mattered here because the original design had the browser's `fetch()` call 
 
 ### Local testing
 Since `admin/page.tsx`, `page.tsx`, and `account/page.tsx` all call the Railway URL directly (not a local `/api/...` route), testing locally via `npm run dev` on `localhost:3000` exercises the *real* Railway server — there is no separate "local mode" for the processing server itself. This is useful: bugs in the Railway server's behavior (e.g. the idle-timeout issue above) reproduce identically whether the frontend is opened from `localhost:3000` or `langreader.vercel.app`, since the Railway server is the same either way. Vercel-specific issues (e.g. the old serverless timeout) do *not* reproduce locally, since `npm run dev` has no execution time limit of its own — those specifically require testing against the deployed `langreader.vercel.app`.
+
+---
+
+## 16b. epub upload & text extraction
+
+### Flow
+Unlike `.txt`, an epub file can't just be read as plain text client-side — it's a ZIP archive of XHTML chapters plus metadata, and needs a real parser. The flow:
+
+1. Client uploads the raw `.epub` file (unparsed) to a private Supabase Storage bucket, `book-sources`, at path `${userId}/${bookId}.epub`
+2. A `books` row is inserted with `status = 'extracting'`, `original_text = ''`, and `source_path` pointing to that Storage path
+3. The client calls the Railway server's `/api/extract` endpoint (via the same `callProcessingApi` helper used for `retell`/`format`, just with `'extract'` as the endpoint)
+4. The server downloads the file using its own service-role Supabase client (no signed URL needs to cross the network — the server already has full access), parses it with `officeparser`, and writes the extracted plain text into `books.original_text`
+5. Status flips to `pending` — from here on, the flow is identical to `.txt`: the user picks "Read original" or "Create retelling" on `/account`
+
+### Why `/api/extract` is synchronous (unlike `/api/retell` and `/api/format`)
+The fire-and-forget background pattern used for retell/format (Section 16a) exists specifically to dodge Railway's 60-second idle connection timeout during *long* Claude processing loops. Extraction doesn't call Claude at all — it's a local parsing operation, comfortably fast even for large files — so `/api/extract` just does the work directly within the request/response cycle and returns the final result. No `jobsInProgress` tracking, no background task, no polling needed for the extraction step itself (though the *existing* 10-second polling on `/account` still covers the brief `extracting` status window in case it takes a moment).
+
+### `officeparser` API gotcha
+`officeparser` v7.x's promise-based API is `parseOffice(buffer)`, which resolves to an AST object with a `.toText()` method — **not** `parseOfficeAsync(buffer)` (which existed in older major versions and was removed). Calling the wrong function name throws a `TypeError` inside the parsing step, which surfaces to the user as a generic "Failed to extract text from file" error. Worth double-checking against the installed version's actual README if `officeparser` is ever upgraded, since this API has changed across major versions before.
+
+### Character limit checks happen server-side, after extraction
+For `.txt`, the client already has the full text in memory (via `FileReader`) before any upload happens, so the 2,000,000-character cap, monthly quota, and grace-pass logic (Section 16) all run client-side in `page.tsx` *before* the book is even inserted. For epub, the real character count is only known *after* `officeparser` has run — so the same limit logic is duplicated server-side inside `/api/extract` (see `checkAndApplyQuota()` in `server.js`), running immediately after extraction succeeds and before `original_text` is saved. This is a known, accepted piece of duplication rather than a shared library, since unifying it properly would mean a larger refactor of how `.txt` uploads work too — not worth doing until there's a second or third reason to.
+
+### Limits specific to epub
+- **Raw file size cap: 20MB.** This is separate from and in addition to the 2,000,000-character cap on the *extracted* text — an epub can be large purely from embedded cover art or illustrations even if the actual text content is modest, so the raw-file cap protects against oversized uploads regardless of how much real text they contain.
+- If extraction succeeds but pushes the user over their monthly character quota for the first time this period, the same "grace pass" behavior from Section 16 applies (the extraction — and the book — still complete for free; the person just sees the same limit-reached message).
+
+### Error states & retry
+A new `extracting` status (distinct from `processing`, which is reserved for the format/retell Claude loop) is shown on `/account` as "Extracting text..." with no percentage — extraction isn't chunked, so a progress bar wouldn't mean anything. On failure, the book's `source_path` (present only for epub-sourced books) is used to decide which retry button to show: "Retry extraction" re-calls `/api/extract` on the already-uploaded file (no need to re-upload), versus the pre-existing "Retry formatting" / "Retry" buttons for `.txt`-sourced books.
+
+### PDF — deliberately not implemented yet
+`officeparser` also supports PDF extraction through the same API, so extending `/api/extract` to accept `.pdf` later should be structurally straightforward. It was scoped out of this pass because PDF text extraction is inherently less reliable than epub — multi-column layouts, footnotes, headers/footers, and scanned pages without OCR can all produce garbled or incomplete text — and was judged worth its own dedicated testing pass rather than shipping alongside epub.
+
 
