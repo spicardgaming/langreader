@@ -58,7 +58,7 @@ export default function AccountPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [booksLoading, setBooksLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
-  const [profile, setProfile] = useState<{ plan: string } | null>(null);
+  const [profile, setProfile] = useState<{ plan: string; subscription_cancel_at: string | null } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [cancelState, setCancelState] = useState<"idle" | "cancelling">("idle");
 
@@ -78,7 +78,7 @@ export default function AccountPage() {
       // Load user profile (plan)
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("plan")
+        .select("plan, subscription_cancel_at")
         .eq("id", data.session.user.id)
         .single();
 
@@ -320,7 +320,7 @@ const handleReadOriginal = async (bookId: string) => {
     if (!userId) return;
 
     const confirmed = window.confirm(
-      "Are you sure you want to cancel your Pro subscription? You will lose access to uploading and retelling texts."
+      "Are you sure you want to cancel your Pro subscription? You'll keep Pro access until the end of your current billing period, and it won't renew after that."
     );
     if (!confirmed) return;
 
@@ -334,8 +334,16 @@ const handleReadOriginal = async (bookId: string) => {
       });
 
       if (response.ok) {
-        window.alert("Your Pro subscription has been cancelled.");
-        setProfile((prev) => (prev ? { ...prev, plan: 'free' } : prev));
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("plan, subscription_cancel_at")
+          .eq("id", userId)
+          .single();
+
+        if (profileData) {
+          setProfile(profileData);
+        }
+        window.alert("Your subscription will end at the close of your current billing period. You'll keep Pro access until then.");
       } else {
         window.alert("Something went wrong. Please try again or contact support.");
       }
@@ -402,7 +410,7 @@ const handleReadOriginal = async (bookId: string) => {
                   {checkoutLoading ? 'Loading...' : 'Upgrade to read your texts'}
                 </button>
               )}
-              {profile?.plan === 'pro' && (
+              {profile?.plan === 'pro' && !profile.subscription_cancel_at && (
                 <button
                   onClick={handleCancelSubscription}
                   disabled={cancelState === 'cancelling'}
@@ -410,6 +418,17 @@ const handleReadOriginal = async (bookId: string) => {
                 >
                   {cancelState === 'cancelling' ? 'Cancelling...' : 'Cancel Pro account'}
                 </button>
+              )}
+              {profile?.plan === 'pro' && profile.subscription_cancel_at && (
+                <span className="text-sm text-[#78716c]">
+                  Pro (cancels on{' '}
+                  {new Date(profile.subscription_cancel_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                  )
+                </span>
               )}
             </div>
           </div>

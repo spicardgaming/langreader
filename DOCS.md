@@ -95,6 +95,13 @@ Site → Sign in → Forgot password → follow email link.
 
 ## 6. Testing Stripe locally
 
+**Recommended: `npm run dev:full`** — runs Next.js and the Stripe CLI listener together in one terminal (via `concurrently`), so it's impossible to forget to start `stripe listen` before testing. This was a repeat source of confusion during development: Checkout would complete successfully in Stripe with no visible error, but `profiles.plan` would silently never update because no webhook event ever reached localhost.
+
+```bash
+npm run dev:full
+```
+
+If you need them separate for any reason:
 ```bash
 # Terminal 1
 npm run dev
@@ -298,16 +305,18 @@ Since `admin/page.tsx`, `page.tsx`, and `account/page.tsx` all call the Railway 
 
 ---
 
-## 16b. epub upload & text extraction
+## 16b. epub & PDF upload and text extraction
 
 ### Flow
-Unlike `.txt`, an epub file can't just be read as plain text client-side — it's a ZIP archive of XHTML chapters plus metadata, and needs a real parser. The flow:
+Unlike `.txt`, epub and PDF files can't just be read as plain text client-side — epub is a ZIP archive of XHTML chapters plus metadata, and PDF is a binary layout format — both need a real parser. The flow (identical for both formats):
 
-1. Client uploads the raw `.epub` file (unparsed) to a private Supabase Storage bucket, `book-sources`, at path `${userId}/${bookId}.epub`
+1. Client uploads the raw file (unparsed) to a private Supabase Storage bucket, `book-sources`, at path `${userId}/${bookId}.${extension}`
 2. A `books` row is inserted with `status = 'extracting'`, `original_text = ''`, and `source_path` pointing to that Storage path
 3. The client calls the Railway server's `/api/extract` endpoint (via the same `callProcessingApi` helper used for `retell`/`format`, just with `'extract'` as the endpoint)
 4. The server downloads the file using its own service-role Supabase client (no signed URL needs to cross the network — the server already has full access), parses it with `officeparser`, and writes the extracted plain text into `books.original_text`
 5. Status flips to `pending` — from here on, the flow is identical to `.txt`: the user picks "Read original" or "Create retelling" on `/account`
+
+`officeparser` auto-detects the format from the file's own content (both epub and PDF are identifiable this way) — `/api/extract` has no format-specific branching at all, it's the same code path for both. The only format-specific logic lives client-side: the `accept` attribute on the file input, the Storage content-type (`application/epub+zip` vs `application/pdf`), and the file extension used to build `source_path`.
 
 ### Why `/api/extract` is synchronous (unlike `/api/retell` and `/api/format`)
 The fire-and-forget background pattern used for retell/format (Section 16a) exists specifically to dodge Railway's 60-second idle connection timeout during *long* Claude processing loops. Extraction doesn't call Claude at all — it's a local parsing operation, comfortably fast even for large files — so `/api/extract` just does the work directly within the request/response cycle and returns the final result. No `jobsInProgress` tracking, no background task, no polling needed for the extraction step itself (though the *existing* 10-second polling on `/account` still covers the brief `extracting` status window in case it takes a moment).
@@ -316,16 +325,25 @@ The fire-and-forget background pattern used for retell/format (Section 16a) exis
 `officeparser` v7.x's promise-based API is `parseOffice(buffer)`, which resolves to an AST object with a `.toText()` method — **not** `parseOfficeAsync(buffer)` (which existed in older major versions and was removed). Calling the wrong function name throws a `TypeError` inside the parsing step, which surfaces to the user as a generic "Failed to extract text from file" error. Worth double-checking against the installed version's actual README if `officeparser` is ever upgraded, since this API has changed across major versions before.
 
 ### Character limit checks happen server-side, after extraction
-For `.txt`, the client already has the full text in memory (via `FileReader`) before any upload happens, so the 2,000,000-character cap, monthly quota, and grace-pass logic (Section 16) all run client-side in `page.tsx` *before* the book is even inserted. For epub, the real character count is only known *after* `officeparser` has run — so the same limit logic is duplicated server-side inside `/api/extract` (see `checkAndApplyQuota()` in `server.js`), running immediately after extraction succeeds and before `original_text` is saved. This is a known, accepted piece of duplication rather than a shared library, since unifying it properly would mean a larger refactor of how `.txt` uploads work too — not worth doing until there's a second or third reason to.
+For `.txt`, the client already has the full text in memory (via `FileReader`) before any upload happens, so the 2,000,000-character cap, monthly quota, and grace-pass logic (Section 16) all run client-side in `page.tsx` *before* the book is even inserted. For epub/PDF, the real character count is only known *after* `officeparser` has run — so the same limit logic is duplicated server-side inside `/api/extract` (see `checkAndApplyQuota()` in `server.js`), running immediately after extraction succeeds and before `original_text` is saved. This is a known, accepted piece of duplication rather than a shared library, since unifying it properly would mean a larger refactor of how `.txt` uploads work too — not worth doing until there's a second or third reason to.
 
-### Limits specific to epub
-- **Raw file size cap: 20MB.** This is separate from and in addition to the 2,000,000-character cap on the *extracted* text — an epub can be large purely from embedded cover art or illustrations even if the actual text content is modest, so the raw-file cap protects against oversized uploads regardless of how much real text they contain.
+### Limits specific to epub/PDF
+- **Raw file size cap: 20MB.** This is separate from and in addition to the 2,000,000-character cap on the *extracted* text — a source file can be large purely from embedded cover art, illustrations, or (for PDF especially) page rendering overhead, even if the actual text content is modest. Raw file weight has **no effect on Claude token cost or the character quota** — only the extracted plain text is ever sent to Claude or counted against the monthly limit, never the raw file bytes.
 - If extraction succeeds but pushes the user over their monthly character quota for the first time this period, the same "grace pass" behavior from Section 16 applies (the extraction — and the book — still complete for free; the person just sees the same limit-reached message).
 
 ### Error states & retry
-A new `extracting` status (distinct from `processing`, which is reserved for the format/retell Claude loop) is shown on `/account` as "Extracting text..." with no percentage — extraction isn't chunked, so a progress bar wouldn't mean anything. On failure, the book's `source_path` (present only for epub-sourced books) is used to decide which retry button to show: "Retry extraction" re-calls `/api/extract` on the already-uploaded file (no need to re-upload), versus the pre-existing "Retry formatting" / "Retry" buttons for `.txt`-sourced books.
+A new `extracting` status (distinct from `processing`, which is reserved for the format/retell Claude loop) is shown on `/account` as "Extracting text..." with no percentage — extraction isn't chunked, so a progress bar wouldn't mean anything. On failure, the book's `source_path` (present only for epub/PDF-sourced books) is used to decide which retry button to show: "Retry extraction" re-calls `/api/extract` on the already-uploaded file (no need to re-upload), versus the pre-existing "Retry formatting" / "Retry" buttons for `.txt`-sourced books.
 
-### PDF — deliberately not implemented yet
-`officeparser` also supports PDF extraction through the same API, so extending `/api/extract` to accept `.pdf` later should be structurally straightforward. It was scoped out of this pass because PDF text extraction is inherently less reliable than epub — multi-column layouts, footnotes, headers/footers, and scanned pages without OCR can all produce garbled or incomplete text — and was judged worth its own dedicated testing pass rather than shipping alongside epub.
+### PDF-specific caveats
+PDF text extraction quality depends entirely on the source document. A scanned PDF with no actual text layer (just page images) extracts nothing — `/api/extract` catches this and returns a clear "Could not extract any text from this file" error rather than silently producing an empty book. Complex layouts (multi-column text, footnotes, headers/footers interleaved with body text) can produce rougher, less cleanly-ordered text than a typical epub. Both formats have been tested end-to-end in production (extraction, Read original, Create retelling) and confirmed working, but PDF quality is inherently more variable and worth spot-checking on real files as they come in.
+
+### `npm audit` reports a high-severity `pdfjs-dist` vulnerability — investigated, not currently actionable
+`npm install` in `balaka-processing` reports a high-severity advisory (CVE-2026-16633, "PDF.js: Arbitrary JavaScript execution upon opening a malicious PDF") via `officeparser`'s `pdfjs-dist` dependency. Investigated in detail rather than blindly running `npm audit fix --force`:
+
+- **No fix currently exists via npm.** Every published `officeparser` version (including the latest, checked directly against the npm registry) pins `pdfjs-dist` to an exact version inside the vulnerable range (`>=5.6.83 <6.2.108`; the patched version is `6.2.108`). `npm audit fix --force` would downgrade `officeparser` to an older major version, but the same vulnerable `pdfjs-dist` pin is still present there too — it doesn't actually resolve anything, it just changes which vulnerable version gets installed.
+- **The vulnerability's real mechanism doesn't apply to how we use it.** Per the official GitHub Security Advisory, this is a CWE-79 (cross-site scripting) issue: it requires PDF.js to be rendering a PDF inside a browser page with `enableScripting: true`, so that attacker-controlled JavaScript executes "in the context of the hosting domain." We run `officeparser` server-side in plain Node.js — there is no browser, no DOM, no "hosting domain" for the described attack to execute in. We only call it to extract plain text (`ast.toText()`), never to render or display the PDF.
+- **`officeparser`'s own source confirms the relevant protection is already in place.** Its `PdfParser.js` calls `pdfjs.getDocument()` with `isEvalSupported: false` and an explicit comment: *"Harden against untrusted PDFs: don't let pdf.js JIT font/CMap fast-paths compile via `new Function`."* It never sets `enableScripting: true` either. Both of these are exactly the settings the advisory's own workaround section recommends.
+
+**Conclusion:** the audit warning is accurate in general but not exploitable in this specific server-side, text-extraction-only usage. No action taken. Worth periodically checking whether a future `officeparser` release bumps its `pdfjs-dist` pin past `6.2.108`, purely to clear the audit noise — not because of an active security gap.
 
 

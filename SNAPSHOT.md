@@ -2,7 +2,9 @@
 _Last updated: July 2026_
 
 ## Current status
-Stage 4 complete. UI/UX improvements done. Language switcher implemented and working. Upgrade/Cancel Pro subscription flow implemented and tested end-to-end (checkout, webhook, in-app cancellation, and direct-in-Stripe cancellation). Reading progress now syncs to Supabase for logged-in users (cross-device), tested and confirmed working. `/api/retell` and `/api/format` migrated off Vercel to a standalone server on Railway, tested end-to-end in production with large books. Monthly/per-file character limits reworked (1M → 2M, plus a one-time "grace pass" and a hard per-file cap) — see DOCS.md Section 16 for the cost reasoning.
+Stage 4 complete. UI/UX improvements done. Language switcher implemented and working. Upgrade/Cancel Pro subscription flow implemented and tested end-to-end (checkout, webhook, in-app cancellation, and direct-in-Stripe cancellation). Reading progress now syncs to Supabase for logged-in users (cross-device), tested and confirmed working. `/api/retell` and `/api/format` migrated off Vercel to a standalone server on Railway, tested end-to-end in production with large books. Monthly/per-file character limits reworked (1M → 2M, plus a one-time "grace pass" and a hard per-file cap) — see DOCS.md Section 16 for the cost reasoning. epub and PDF upload/extraction implemented and tested end-to-end in production on langreader.vercel.app (extraction, Read original, Create retelling, both formats) — see DOCS.md Section 16b.
+
+Real launch is approaching. Concurrency hardening (retry-with-backoff, orphaned-job cleanup, processing concurrency limit) is now implemented and deployed — see "Concurrency hardening ✅" below.
 
 Full UI internationalization is intentionally postponed — interface stays English-only for now. PWA is planned as the final step, after all other plan items are done.
 
@@ -69,13 +71,15 @@ Full UI internationalization is intentionally postponed — interface stays Engl
 - `stripe_subscription_id` column added to `profiles`
 - `app/api/stripe/checkout/route.ts` — added `subscription_data: { metadata: { userId } }` so the *subscription* itself (not just the checkout session) carries `userId`; required for subscription-level webhook events (e.g. cancellations initiated directly in Stripe) to identify the user
 - `app/api/stripe/webhook/route.ts`:
-  - `checkout.session.completed` (mode=subscription) now also saves `stripe_subscription_id` on the profile, alongside setting `plan='pro'`
-  - `customer.subscription.deleted` resets `profiles.plan = 'free'` — covers both in-app cancellation and cancellation done directly in the Stripe dashboard
-- New route `app/api/stripe/cancel/route.ts` — calls `stripe.subscriptions.cancel()`, then sets `profiles.plan = 'free'`, `stripe_subscription_id = null`
-- `app/account/page.tsx` — conditional buttons in the same row as the email box:
-  - Free plan: "Upgrade to read your texts" (black button) → Stripe Checkout
-  - Pro plan: "Cancel Pro account" (underlined text link) → confirm dialog → cancel API → alert feedback
-- Tested end-to-end locally with Stripe CLI (`stripe listen`), including test card `4242 4242 4242 4242`: upgrade, in-app cancel, and direct-in-Stripe cancel all correctly sync `profiles.plan`
+  - `checkout.session.completed` (mode=subscription) saves `stripe_subscription_id` on the profile, alongside setting `plan='pro'`, and clears `subscription_cancel_at`
+  - `customer.subscription.updated` — new handler, the authoritative source for whether a subscription is scheduled to cancel and when; syncs `subscription_cancel_at` any time this changes (whether triggered by our own cancel route or directly in the Stripe dashboard)
+  - `customer.subscription.deleted` — fires when a subscription actually ends (immediately, or because a scheduled end-of-period cancellation has now passed); this is the single place `profiles.plan` actually gets downgraded to `'free'`, alongside clearing `stripe_subscription_id` and `subscription_cancel_at`
+- **Cancellation model: end-of-period, not immediate.** `app/api/stripe/cancel/route.ts` calls `stripe.subscriptions.update(id, { cancel_at_period_end: true })` rather than `stripe.subscriptions.cancel()` — matches standard SaaS practice (Readlang and most others work this way too): the person keeps Pro access for whatever they already paid for, and the subscription simply doesn't renew. `profiles.plan` is deliberately *not* touched by this route — only the `customer.subscription.deleted` webhook handler downgrades it, once the period actually ends.
+- New `profiles.subscription_cancel_at` column (timestamptz, nullable) — holds the date Pro access will end, if a cancellation is scheduled; `null` otherwise. Set both optimistically by the cancel route (for instant UI feedback) and authoritatively by the `customer.subscription.updated` webhook handler (covers all paths, including direct-in-Stripe cancellation).
+- `app/account/page.tsx` — three states next to the email box: Free → "Upgrade to read your texts" button; Pro, not cancelling → "Cancel Pro account" link; Pro, cancellation scheduled → static text "Pro (cancels on [date])" instead of the link
+- **Stripe API gotcha:** as of the "Basil" API version (2025-03-31) and all versions since (the account here is on `2026-06-24.dahlia`), `current_period_end`/`current_period_start` no longer exist on the top-level `Subscription` object — they moved to `subscription.items.data[0].current_period_end`. Reading the old top-level field silently returns `undefined`, and passing that into `new Date(undefined * 1000).toISOString()` throws at runtime (surfaced as a 500 from `/api/stripe/cancel`). Both `cancel/route.ts` and the `customer.subscription.updated` webhook handler read `items.data?.[0]?.current_period_end` first, falling back to the old top-level field defensively.
+- **Local dev convenience:** added `concurrently` as a dev dependency and a new `npm run dev:full` script (`concurrently "npm run dev" "stripe.exe listen --forward-to localhost:3000/api/stripe/webhook"`) — runs Next.js and the Stripe CLI listener together in one terminal, so it's no longer possible to forget to start `stripe listen` before testing a Stripe flow locally (a mistake that repeatedly caused "payment succeeded in Stripe but profile never updated" confusion during development). Use `npm run dev:full` instead of `npm run dev` when testing anything Stripe-related.
+- Tested end-to-end locally with Stripe CLI (`stripe listen`), including test card `4242 4242 4242 4242`: upgrade, in-app cancel (now end-of-period), and direct-in-Stripe cancel all correctly sync `profiles.plan` and `subscription_cancel_at`
 
 ### Reading progress sync ✅
 - New Supabase table `reading_progress`: composite primary key `(user_id, book_id)`, columns `page`, `updated_at`; RLS policy restricts each user to their own rows
@@ -102,6 +106,28 @@ Full UI internationalization is intentionally postponed — interface stays Engl
 - New hard per-file cap: no single upload may exceed 2,000,000 characters, checked before any quota logic, regardless of plan or remaining quota
 - New "grace pass": the first upload in a period that pushes a user over their monthly quota is still processed for free (message: "You have reached your monthly limit of 2,000,000 characters. Anyway, we will finish this task for you for free.") — any further attempt once already over quota is hard-blocked as before
 - Numbers chosen based on actual Claude Haiku 4.5 API pricing worked out from a worst-case single-file cost estimate — see DOCS.md Section 16 for the full math and the caveat that this doesn't by itself confirm overall Pro-tier profitability (translation-lookup volume during reading is the bigger unknown)
+
+### Concurrency hardening ✅
+Triggered by the question "what happens when 10-100 people upload/process books at the same time," ahead of opening the product up for real. Three steps, implemented in this order:
+
+1. **Retry-with-backoff for Anthropic `429`/`529`s.** `callClaude()` in `server.js` now retries a rate-limited or overloaded response up to 4 times, using the `retry-after` header when Anthropic provides one, otherwise exponential backoff (1s, 2s, 4s, 8s). Previously a single rate-limited chunk would immediately fail the whole book to `status: 'error'`, even though a 429 is usually transient.
+2. **Orphaned-job cleanup on server startup.** `jobsInProgress` and all in-flight background processing lived purely in memory — a Railway restart (new deploy, crash) while books were mid-processing used to leave them stuck showing "Processing..."/"Extracting..." with a stale progress percentage forever. `cleanupOrphanedJobs()` now runs once before the server starts accepting requests: any book already in `status = 'processing'` or `'extracting'` at startup (impossible for a freshly-started process to have legitimately caused) gets flipped to `status = 'error'`, so the person sees a clear "Retry" button instead.
+3. **Concurrency limit on simultaneous processing jobs.** Added `p-limit` (pinned to `^3.1.0` — later major versions are ESM-only and don't support `require()`), capping how many books can be actively going through Claude (retell/format) at once to 3 (`CONCURRENT_PROCESSING_LIMIT`); the rest queue in memory until a slot frees up. Reduces how often concurrent uploads trip Anthropic's rate limits in the first place, and makes step 1's retries more effective (fewer simultaneous retries competing for the same limit).
+
+**Explicitly deferred:** a durable, persistent job queue (e.g. Redis + BullMQ) that would let interrupted jobs actually *resume* after a restart, instead of just failing cleanly. This is the "correct" long-term answer but is meaningfully more infrastructure (a new service, a new failure mode, added cost) for a problem the three steps above should keep rare enough at current scale. Revisit if real usage shows steps 1-3 aren't sufficient.
+
+Also investigated during this pass: `npm audit` flags a high-severity `pdfjs-dist` vulnerability (via `officeparser`) in `balaka-processing`. Determined not to be exploitable in our server-side, text-extraction-only usage — see DOCS.md Section 16b for the full writeup (the vulnerability requires browser/DOM scripting context we don't have, and `officeparser` already hardens against the underlying mechanism). No fix currently exists via `npm audit fix` regardless (every published `officeparser` version pins the same vulnerable `pdfjs-dist` version) — left as-is, documented so it isn't re-investigated from scratch later.
+
+### epub & PDF upload ✅
+- New private Supabase Storage bucket `book-sources`, RLS-scoped so each user can only access their own uploaded files (path prefix `${userId}/...`)
+- New `books.source_path` column, pointing to the raw uploaded file in that bucket
+- New Railway endpoint `/api/extract`: downloads the raw file via the service-role client, extracts plain text using `officeparser` (`parseOffice()` → `ast.toText()`, auto-detects epub vs PDF from the file content itself — no format-specific server code needed), then applies the same 2,000,000-character monthly quota + grace-pass logic used for `.txt` uploads (duplicated server-side here, since the character count is only known *after* extraction — noted as minor tech debt, see DOCS.md Section 16b)
+- Unlike `/api/retell` and `/api/format`, `/api/extract` runs synchronously (awaited, not fire-and-forget) — extraction is fast (no Claude calls involved) and comfortably finishes well under Railway's 60-second idle timeout
+- New book status `extracting`, shown on `/account` as "Extracting text..." (no percentage — extraction isn't chunked, so a progress bar wouldn't be meaningful); picked up by the same 10-second polling used for `processing`
+- New hard cap on raw file size: 20MB per upload for epub/PDF (separate from the 2,000,000-character cap on extracted text, since these files can be large due to embedded images even when the actual text is small) — file weight itself has no effect on Claude token cost, since only the extracted plain text is ever sent to the API, not the raw file
+- Error retry flow distinguishes extraction failures (`book.source_path` present → "Retry extraction", re-runs `/api/extract` on the already-uploaded file) from format/retelling failures (existing "Retry formatting" / "Retry" buttons, unchanged)
+- Client-side changes generalized from an epub-specific `isEpub` flag to a `needsExtraction` flag covering both epub and PDF — the upload flow, storage path, and content-type are now derived from the actual file extension rather than hardcoded
+- PDF text extraction quality depends entirely on the source document — scanned pages with no text layer extract nothing (surfaces as a clear error rather than failing silently), and complex layouts (columns, footnotes) can produce rougher text than a typical epub; both formats tested end-to-end (extraction, Read original, Create retelling) and confirmed working
 
 ### UI/UX improvements ✅
 - Book grid with 2:3 aspect ratio covers, colored placeholders (`book.id.charCodeAt(0) % COVER_COLORS.length`)
@@ -223,7 +249,8 @@ DOCS.md
 | native_language | text | default 'ru' |
 | learning_language | text | default 'en' |
 | email | text | populated by trigger on signup; backfilled manually for old accounts |
-| stripe_subscription_id | text | populated by webhook on subscription checkout; cleared to null on cancellation (in-app or direct-in-Stripe) |
+| stripe_subscription_id | text | populated by webhook on subscription checkout; cleared to null only when the subscription actually ends (`customer.subscription.deleted`), not when cancellation is first requested |
+| subscription_cancel_at | timestamptz | null unless a cancellation is scheduled; holds the date Pro access will end. Set by both `/api/stripe/cancel` (optimistic) and the `customer.subscription.updated` webhook (authoritative) |
 
 ### `reading_progress`
 | Column | Type | Notes |
@@ -291,7 +318,6 @@ Separately, the `balaka-processing` repo on Railway has its own env vars (`ANTHR
 ## Known issues
 
 - Double-click word selection captures trailing space — workaround: use click+drag
-- epub upload not implemented
 - Hydration warning in console — cosmetic
 - Old `/api/retell` and `/api/format` routes still exist in the Vercel codebase but are unused (superseded by the Railway server) — safe to delete once the migration has proven stable for a while; kept for now as a rollback safety net
 - `/api/stripe/cancel` still trusts `userId` from the request body rather than verifying the session server-side — unlike the new Railway processing server, this route wasn't touched during the migration and still has the same trust gap noted previously; worth revisiting if stricter auth is needed later
@@ -301,7 +327,7 @@ Separately, the `balaka-processing` repo on Railway has its own env vars (`ANTHR
 ## Possible improvements (deferred)
 
 ### High priority
-- epub/pdf upload support
+(none currently — see Medium/Low priority below for what's left)
 
 ### Postponed (intentionally deferred, not a priority right now)
 - Full UI internationalization (interface strings currently English-only regardless of native_language) — too much code to justify right now

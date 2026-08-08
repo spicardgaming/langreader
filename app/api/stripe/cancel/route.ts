@@ -50,21 +50,31 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await stripe.subscriptions.cancel(profile.stripe_subscription_id);
+    const updatedSubscription = await stripe.subscriptions.update(
+      profile.stripe_subscription_id,
+      { cancel_at_period_end: true },
+    );
 
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        plan: "free",
-        stripe_subscription_id: null,
-      })
-      .eq("id", userId);
+    // Note: we deliberately do NOT downgrade profiles.plan or clear
+    // stripe_subscription_id here. The person keeps Pro access until the
+    // subscription actually ends — Stripe fires `customer.subscription.deleted`
+    // at that point, and the webhook handles the downgrade then.
+    //
+    // We DO save the scheduled end date right away (rather than waiting for the
+    // webhook) so the UI can show "cancels on <date>" immediately.
+    const currentPeriodEnd =
+      (updatedSubscription as any).items?.data?.[0]?.current_period_end ??
+      (updatedSubscription as any).current_period_end;
 
-    if (updateError) {
-      return NextResponse.json(
-        { error: "Failed to update profile" },
-        { status: 500 },
-      );
+    if (currentPeriodEnd) {
+      await supabase
+        .from("profiles")
+        .update({
+          subscription_cancel_at: new Date(currentPeriodEnd * 1000).toISOString(),
+        })
+        .eq("id", userId);
+    } else {
+      console.warn("Could not determine current_period_end for subscription", profile.stripe_subscription_id);
     }
 
     return NextResponse.json({ success: true });
