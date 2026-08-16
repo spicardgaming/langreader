@@ -149,7 +149,7 @@ export default function ReaderPage({
 
   return (
     <>
-      <Reader title={book.title} paragraphs={currentParagraphs} />
+      <Reader title={book.title} paragraphs={currentParagraphs} bookLanguage={book.language} />
       {totalPages > 1 && (
         <div className="mx-auto w-full max-w-[700px] mt-10 flex flex-col items-center gap-4 pb-12">
           <p className="text-sm text-[#78716c]">Page {currentPage} of {totalPages}</p>

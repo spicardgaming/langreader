@@ -73,6 +73,7 @@ type PopupPlacement = {
 type ReaderProps = {
   title: string;
   paragraphs: string[];
+  bookLanguage: string;
 };
 
 const POPUP_GAP = 8;
@@ -321,7 +322,7 @@ function expandRangeToPhraseBounds(
   return setRangeOffsets(paragraph, phraseStart, phraseEnd);
 }
 
-export default function Reader({ title, paragraphs }: ReaderProps) {
+export default function Reader({ title, paragraphs, bookLanguage }: ReaderProps) {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [popup, setPopup] = useState<PopupState | null>(null);
@@ -596,7 +597,7 @@ export default function Reader({ title, paragraphs }: ReaderProps) {
     fetch("/api/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-body: JSON.stringify({ word: text, context, isPhrase, nativeLanguage: localStorage.getItem('balaka_native_language') || 'ru', learningLanguage: localStorage.getItem('balaka_learning_language') || 'en' }),    })
+body: JSON.stringify({ word: text, context, isPhrase, nativeLanguage: localStorage.getItem('balaka_native_language') || 'ru', learningLanguage: bookLanguage }),    })
       .then(async (res) => {
         const payload = (await res.json()) as
           | (WordTranslateResult & { error?: string })
@@ -687,6 +688,7 @@ body: JSON.stringify({ word: text, context, isPhrase, nativeLanguage: localStora
             context: text,
             isParagraph: true,
             nativeLanguage: localStorage.getItem('balaka_native_language') || 'ru',
+            learningLanguage: bookLanguage,
           }),
             signal: controller.signal,
           });

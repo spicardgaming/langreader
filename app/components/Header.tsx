@@ -5,24 +5,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-const LEARNING_LANGUAGES = [
+// Single shared list used for both "I learn" and "I know" — previously these were
+// two separate arrays (plus a third copy in app/api/translate/route.ts's
+// LANGUAGE_NAMES map), which was a repeat source of bugs when one list got a new
+// language added and the others didn't. LEARNING no longer needs to be restricted
+// to languages with public-library books, now that users can upload their own
+// text in any language directly.
+const ALL_LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Spanish' },
-  { code: 'de', label: 'German' },
-  // { code: 'fr', label: 'French' },
-  // { code: 'it', label: 'Italian' },
-  // { code: 'pt', label: 'Portuguese' },
-  // { code: 'ca', label: 'Catalan' },
-];
-
-const NATIVE_LANGUAGES = [
-  
-  { code: 'en', label: 'English' },
-  { code: 'es', label: 'Spanish' },
-  { code: 'de', label: 'German' },
   { code: 'fr', label: 'French' },
+  { code: 'de', label: 'German' },
   { code: 'it', label: 'Italian' },
   { code: 'pt', label: 'Portuguese' },
+  { code: 'ru', label: 'Russian' },
   { code: 'uk', label: 'Ukrainian' },
   { code: 'ca', label: 'Catalan' },
   { code: 'zh', label: 'Chinese' },
@@ -36,29 +32,74 @@ const NATIVE_LANGUAGES = [
   { code: 'vi', label: 'Vietnamese' },
   { code: 'th', label: 'Thai' },
   { code: 'id', label: 'Indonesian' },
-  { code: 'ru', label: 'Russian' },
+  { code: 'bn', label: 'Bengali' },
+  { code: 'fa', label: 'Persian' },
+  { code: 'he', label: 'Hebrew' },
+  { code: 'ur', label: 'Urdu' },
+  { code: 'ro', label: 'Romanian' },
+  { code: 'hu', label: 'Hungarian' },
+  { code: 'cs', label: 'Czech' },
+  { code: 'sk', label: 'Slovak' },
+  { code: 'bg', label: 'Bulgarian' },
+  { code: 'el', label: 'Greek' },
+  { code: 'sv', label: 'Swedish' },
+  { code: 'no', label: 'Norwegian' },
+  { code: 'da', label: 'Danish' },
+  { code: 'fi', label: 'Finnish' },
+  { code: 'sr', label: 'Serbian' },
+  { code: 'hr', label: 'Croatian' },
+  { code: 'ms', label: 'Malay' },
+  { code: 'sw', label: 'Swahili' },
+  { code: 'az', label: 'Azerbaijani' },
+  { code: 'ka', label: 'Georgian' },
+  { code: 'hy', label: 'Armenian' },
 ];
+
+const POPULAR_LANGUAGE_CODES = ['en', 'es', 'de', 'fr', 'ru', 'uk', 'zh', 'pt'];
 
 type LanguageDropdownProps = {
   value: string;
   languages: { code: string; label: string }[];
+  popularCodes: string[];
   onChange: (code: string) => void;
 };
 
-function LanguageDropdown({ value, languages, onChange }: LanguageDropdownProps) {
+function LanguageDropdown({ value, languages, popularCodes, onChange }: LanguageDropdownProps) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const selected = languages.find(l => l.code === value);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
+        setQuery("");
       }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  const handleSelect = (code: string) => {
+    onChange(code);
+    setOpen(false);
+    setQuery("");
+  };
+
+  const trimmedQuery = query.trim().toLowerCase();
+  const popularLanguages = languages.filter(l => popularCodes.includes(l.code));
+  const listLanguages = trimmedQuery
+    ? languages.filter(l => l.label.toLowerCase().includes(trimmedQuery))
+    : languages.filter(l => !popularCodes.includes(l.code));
 
   return (
     <div ref={ref} className="relative">
@@ -72,19 +113,51 @@ function LanguageDropdown({ value, languages, onChange }: LanguageDropdownProps)
         </svg>
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 min-w-[160px] rounded-xl border border-[#e7e5e4] bg-white py-1 shadow-lg">
-          {languages.map(l => (
-            <button
-              key={l.code}
-              onClick={() => { onChange(l.code); setOpen(false); }}
-              className="flex w-full items-center gap-2 px-4 py-2 text-sm text-[#1a1a1a] hover:bg-[#f5f5f4] transition-colors"
-            >
-              <span className="w-4 text-[#2c2c2c]">
-                {l.code === value ? '✓' : ''}
-              </span>
-              {l.label}
-            </button>
-          ))}
+        <div className="absolute left-0 top-full z-50 mt-1 w-[220px] rounded-xl border border-[#e7e5e4] bg-white shadow-lg overflow-hidden">
+          <div className="border-b border-[#e7e5e4] p-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search language..."
+              className="w-full rounded-lg border border-[#e7e5e4] px-2.5 py-1.5 text-sm text-[#1a1a1a] outline-none focus:border-[#a8a29e]"
+            />
+          </div>
+          <div className="max-h-[280px] overflow-y-auto py-1">
+            {!trimmedQuery && popularLanguages.length > 0 && (
+              <>
+                <div className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-[#a8a29e]">
+                  Popular
+                </div>
+                {popularLanguages.map(l => (
+                  <button
+                    key={l.code}
+                    onClick={() => handleSelect(l.code)}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-[#1a1a1a] hover:bg-[#f5f5f4] transition-colors"
+                  >
+                    <span className="w-4 text-[#2c2c2c]">{l.code === value ? '✓' : ''}</span>
+                    {l.label}
+                  </button>
+                ))}
+                <div className="my-1 border-t border-[#e7e5e4]" />
+              </>
+            )}
+            {listLanguages.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-[#a8a29e]">No languages found</div>
+            ) : (
+              listLanguages.map(l => (
+                <button
+                  key={l.code}
+                  onClick={() => handleSelect(l.code)}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-[#1a1a1a] hover:bg-[#f5f5f4] transition-colors"
+                >
+                  <span className="w-4 text-[#2c2c2c]">{l.code === value ? '✓' : ''}</span>
+                  {l.label}
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -115,8 +188,14 @@ export default function Header() {
           .select('native_language, learning_language')
           .eq('id', data.session.user.id)
           .single();
-        if (profile?.native_language) setNativeLanguage(profile.native_language);
-        if (profile?.learning_language) setLearningLanguage(profile.learning_language);
+        if (profile?.native_language) {
+          setNativeLanguage(profile.native_language);
+          localStorage.setItem('balaka_native_language', profile.native_language);
+        }
+        if (profile?.learning_language) {
+          setLearningLanguage(profile.learning_language);
+          localStorage.setItem('balaka_learning_language', profile.learning_language);
+        }
       }
     }
     checkSession();
@@ -162,13 +241,15 @@ export default function Header() {
           <span>I learn</span>
           <LanguageDropdown
             value={learningLanguage}
-            languages={LEARNING_LANGUAGES}
+            languages={ALL_LANGUAGES}
+            popularCodes={POPULAR_LANGUAGE_CODES}
             onChange={(code) => handleLanguageChange('learning', code)}
           />
           <span>I know</span>
           <LanguageDropdown
             value={nativeLanguage}
-            languages={NATIVE_LANGUAGES}
+            languages={ALL_LANGUAGES}
+            popularCodes={POPULAR_LANGUAGE_CODES}
             onChange={(code) => handleLanguageChange('native', code)}
           />
         </div>

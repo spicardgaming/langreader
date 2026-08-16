@@ -139,12 +139,29 @@ const { word, context, isPhrase, isParagraph, nativeLanguage = 'Russian', learni
     return NextResponse.json({ error: "context is required" }, { status: 400 });
   }
 
+  // Keep this map in sync with ALL_LANGUAGES in app/components/Header.tsx and
+  // the language dropdown in app/admin/page.tsx — a code missing here silently
+  // falls back to Russian/English below (logged as a warning so it's at least
+  // visible in the server logs rather than only surfacing as a wrong-language
+  // translation with no trace of why).
   const LANGUAGE_NAMES: Record<string, string> = {
     en: 'English', es: 'Spanish', fr: 'French', de: 'German',
     it: 'Italian', pt: 'Portuguese', ru: 'Russian', uk: 'Ukrainian', ca: 'Catalan',
     zh: 'Chinese', ja: 'Japanese', ko: 'Korean', ar: 'Arabic', hi: 'Hindi',
     tr: 'Turkish', pl: 'Polish', nl: 'Dutch', vi: 'Vietnamese', th: 'Thai', id: 'Indonesian',
+    bn: 'Bengali', fa: 'Persian', he: 'Hebrew', ur: 'Urdu', ro: 'Romanian',
+    hu: 'Hungarian', cs: 'Czech', sk: 'Slovak', bg: 'Bulgarian', el: 'Greek',
+    sv: 'Swedish', no: 'Norwegian', da: 'Danish', fi: 'Finnish', sr: 'Serbian',
+    hr: 'Croatian', ms: 'Malay', sw: 'Swahili', az: 'Azerbaijani', ka: 'Georgian', hy: 'Armenian',
   };
+
+  if (!LANGUAGE_NAMES[nativeLanguage]) {
+    console.warn(`/api/translate: unknown nativeLanguage code "${nativeLanguage}", falling back to Russian`);
+  }
+  if (!LANGUAGE_NAMES[learningLanguage]) {
+    console.warn(`/api/translate: unknown learningLanguage code "${learningLanguage}", falling back to English`);
+  }
+
   const targetLanguage = LANGUAGE_NAMES[nativeLanguage] ?? 'Russian';
   const sourceLanguage = LANGUAGE_NAMES[learningLanguage] ?? 'English';
   const prompt = isParagraph

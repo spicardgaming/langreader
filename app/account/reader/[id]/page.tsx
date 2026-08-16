@@ -8,10 +8,11 @@ import Reader from "@/app/components/Reader";
 type Book = {
   id: string;
   title: string;
-  status: "pending" | "processing" | "done" | "error";
+  status: "pending" | "extracting" | "processing" | "done" | "error";
   retelling_text: string | null;
   original_text: string | null;
   user_id: string;
+  language: string;
 };
 
 const PARAGRAPHS_PER_PAGE = 10;
@@ -98,13 +99,15 @@ export default function UserBookReaderPage() {
     );
   }
 
-  if (book.status === "pending" || book.status === "processing") {
+  if (book.status === "pending" || book.status === "processing" || book.status === "extracting") {
     return (
       <div
         className="flex min-h-full items-center justify-center bg-[#f7f5f0] px-4 py-12 text-[#2c2c2c]"
         style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
       >
-        <p className="text-lg text-[#57534e]">Book is being processed...</p>
+        <p className="text-lg text-[#57534e]">
+          {book.status === "extracting" ? "Extracting text..." : "Book is being processed..."}
+        </p>
       </div>
     );
   }
@@ -188,7 +191,7 @@ export default function UserBookReaderPage() {
   return (
     <>
       
-      <Reader title={book.title} paragraphs={currentParagraphs} />
+      <Reader title={book.title} paragraphs={currentParagraphs} bookLanguage={book.language} />
       
       {totalPages > 1 && (
         <div className="mx-auto w-full max-w-[700px] mt-10 flex flex-col items-center gap-4 pb-12">

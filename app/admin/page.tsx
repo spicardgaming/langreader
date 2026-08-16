@@ -296,6 +296,38 @@ setUploadMessage('Book uploaded and formatted successfully');
             <option value="ru">Russian</option>
             <option value="uk">Ukrainian</option>
             <option value="ca">Catalan</option>
+            <option value="zh">Chinese</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+            <option value="ar">Arabic</option>
+            <option value="hi">Hindi</option>
+            <option value="tr">Turkish</option>
+            <option value="pl">Polish</option>
+            <option value="nl">Dutch</option>
+            <option value="vi">Vietnamese</option>
+            <option value="th">Thai</option>
+            <option value="id">Indonesian</option>
+            <option value="bn">Bengali</option>
+            <option value="fa">Persian</option>
+            <option value="he">Hebrew</option>
+            <option value="ur">Urdu</option>
+            <option value="ro">Romanian</option>
+            <option value="hu">Hungarian</option>
+            <option value="cs">Czech</option>
+            <option value="sk">Slovak</option>
+            <option value="bg">Bulgarian</option>
+            <option value="el">Greek</option>
+            <option value="sv">Swedish</option>
+            <option value="no">Norwegian</option>
+            <option value="da">Danish</option>
+            <option value="fi">Finnish</option>
+            <option value="sr">Serbian</option>
+            <option value="hr">Croatian</option>
+            <option value="ms">Malay</option>
+            <option value="sw">Swahili</option>
+            <option value="az">Azerbaijani</option>
+            <option value="ka">Georgian</option>
+            <option value="hy">Armenian</option>
           </select>
         </div>
 
