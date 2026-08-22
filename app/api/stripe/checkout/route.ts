@@ -18,8 +18,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-const mode = priceId === process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID ? 'subscription' : 'payment';
-console.log('priceId:', priceId, 'PRO_PRICE_ID:', process.env.STRIPE_PRO_PRICE_ID, 'mode:', mode);
+    const isProPrice =
+      priceId === process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID ||
+      priceId === process.env.NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID;
+    const mode = isProPrice ? 'subscription' : 'payment';
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],

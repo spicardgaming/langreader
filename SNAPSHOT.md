@@ -138,6 +138,15 @@ Triggered by a real question: "if a user learns English but uploads an Italian t
 - Claude-based language mismatch check, warn-only — fold into the existing `/api/format`/`/api/retell` Claude calls on Railway, ask Claude to also return the detected language code alongside its main task; if it disagrees with what the person declared at upload, save to `books.detected_language` and show a plain warning on `/account` — no auto-correction
 - `cards.language` populated from `book.language` whenever a word/phrase is saved — groundwork for future per-language audio pronunciation
 
+### Legal pages ✅
+- New pages `app/privacyPolicy/page.tsx` and `app/termsOfService/page.tsx`, styled to match the rest of the site (same container/typography/color tokens as `pricing`, `account`; the legal-basis table from the draft was rendered as stacked cards instead of an HTML `<table>`, since no table is used anywhere else in the site)
+- Content grounded in how Balaka actually operates today: Oleksandr Zlydennyi as an individual data controller based in Spain (no registered business entity yet), Supabase hosted in the EU, Stripe/Anthropic named explicitly as sub-processors involving a US data transfer, cancellation described as end-of-period (matching the actual `cancel_at_period_end` implementation), EU 14-day withdrawal right carved out for digital content, 14-year minimum age (matches Spain's LOPDGDD digital consent age)
+- Styled after Readlang's Privacy Policy / Terms of Service (also a Spain-based, EU-facing language-learning subscription service) as a structural and tone reference — confirmed directly from Readlang's own published ToS, not inferred, before being used as a basis for comparison
+- Two placeholders left deliberately blank pending real values: contact email (to be created, likely via the domain registrar once `balaka.app` is connected) and NIF/NIE tax ID (pending autónomo registration in Spain) — both pages explain what these are and that they're temporary
+- **Known gap, disclosed directly in the Privacy Policy text:** there is no self-service "delete my account" button yet — deletion is currently a manual, by-request process (email us). This is flagged as a real product gap (GDPR's right to erasure expects this to be honorable, not necessarily self-service) rather than silently promising a capability that doesn't exist
+- Both pages end with an explicit, visible disclaimer that this is a good-faith draft grounded in the product's real behavior, not a substitute for review by a qualified lawyer — appropriate given real payments and an international audience are involved
+- Footer updated (`app/components/Footer.tsx`) to link both pages — previously they'd only have been reachable by direct URL
+
 ### Homepage → landing page (planned, not yet implemented)
 Upload widget is already off the homepage (see above). Still pending: redesigning `app/page.tsx`'s content/copy as an actual landing/marketing page — ties into the broader "actualize service description, technical pages" work happening before real launch (see below).
 

@@ -28,10 +28,13 @@ export default function Footer() {
           >
             Pricing
           </Link>
-          <Link
-            href="/about"
-            className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline"
-          >
+          <Link href="/privacyPolicy" className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline">
+            Privacy Policy
+          </Link>
+          <Link href="/termsOfService" className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline">
+            Terms of Service
+          </Link>
+          <Link href="/about" className="text-[#57534e] underline-offset-2 hover:text-[#1a1a1a] hover:underline">
             About us
           </Link>
           <Link
