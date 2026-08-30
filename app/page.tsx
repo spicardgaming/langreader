@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -15,150 +15,11 @@ import "./landing.css";
      public/landing/favicon.svg
 */
 
-const ALL_LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "es", label: "Spanish" },
-  { code: "fr", label: "French" },
-  { code: "de", label: "German" },
-  { code: "it", label: "Italian" },
-  { code: "pt", label: "Portuguese" },
-  { code: "ru", label: "Russian" },
-  { code: "uk", label: "Ukrainian" },
-  { code: "ca", label: "Catalan" },
-  { code: "zh", label: "Chinese" },
-  { code: "ja", label: "Japanese" },
-  { code: "ko", label: "Korean" },
-  { code: "ar", label: "Arabic" },
-  { code: "hi", label: "Hindi" },
-  { code: "tr", label: "Turkish" },
-  { code: "pl", label: "Polish" },
-  { code: "nl", label: "Dutch" },
-  { code: "vi", label: "Vietnamese" },
-  { code: "th", label: "Thai" },
-  { code: "id", label: "Indonesian" },
-  { code: "bn", label: "Bengali" },
-  { code: "fa", label: "Persian" },
-  { code: "he", label: "Hebrew" },
-  { code: "ur", label: "Urdu" },
-  { code: "ro", label: "Romanian" },
-  { code: "hu", label: "Hungarian" },
-  { code: "cs", label: "Czech" },
-  { code: "sk", label: "Slovak" },
-  { code: "bg", label: "Bulgarian" },
-  { code: "el", label: "Greek" },
-  { code: "sv", label: "Swedish" },
-  { code: "no", label: "Norwegian" },
-  { code: "da", label: "Danish" },
-  { code: "fi", label: "Finnish" },
-  { code: "sr", label: "Serbian" },
-  { code: "hr", label: "Croatian" },
-  { code: "ms", label: "Malay" },
-  { code: "sw", label: "Swahili" },
-  { code: "az", label: "Azerbaijani" },
-  { code: "ka", label: "Georgian" },
-  { code: "hy", label: "Armenian" },
-];
-
-const POPULAR_CODES = ["en", "es", "de", "fr", "ru", "uk", "zh", "pt"];
-
 function ArrowIcon() {
   return <img src="/landing/arrow.svg" alt="" width={16} height={16} />;
 }
 function CheckIcon() {
   return <img src="/landing/check.svg" alt="" width={16} height={16} />;
-}
-
-/* Custom language dropdown for the landing header — same Popular/divider/full-list
-   pattern as the site-wide Header.tsx dropdown, restyled for this page. */
-function LandingLanguageDropdown({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (code: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = ALL_LANGUAGES.find((l) => l.code === value);
-  const popular = ALL_LANGUAGES.filter((l) => POPULAR_CODES.includes(l.code));
-  const rest = ALL_LANGUAGES.filter((l) => !POPULAR_CODES.includes(l.code));
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const optionStyle = (code: string): React.CSSProperties => ({
-    display: "block",
-    width: "100%",
-    textAlign: "left",
-    padding: "8px 14px",
-    fontSize: 13,
-    background: code === value ? "#f3e6d8" : "transparent",
-    border: 0,
-    cursor: "pointer",
-    color: "#1d2c27",
-  });
-
-  return (
-    <div ref={ref} className="lang-pill" style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          border: "1px solid #d9d5ca",
-          borderRadius: 99,
-          padding: "6px 12px",
-          background: "#fffdf8",
-          color: "#1d2c27",
-          fontSize: 12,
-        }}
-      >
-        <span style={{ color: "#7c8581" }}>{label}</span>
-        {selected?.label}
-      </button>
-      {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "115%",
-            left: 0,
-            zIndex: 50,
-            width: 200,
-            maxHeight: 300,
-            overflowY: "auto",
-            background: "#fffdf8",
-            border: "1px solid #e3ddc9",
-            borderRadius: 12,
-            boxShadow: "0 15px 40px rgba(29,44,39,0.15)",
-            padding: "6px 0",
-          }}
-        >
-          <p style={{ padding: "4px 14px", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "#a39c86" }}>
-            Popular
-          </p>
-          {popular.map((l) => (
-            <button key={l.code} onClick={() => { onChange(l.code); setOpen(false); }} style={optionStyle(l.code)}>
-              {l.label}
-            </button>
-          ))}
-          <div style={{ borderTop: "1px solid #e3ddc9", margin: "6px 0" }} />
-          {rest.map((l) => (
-            <button key={l.code} onClick={() => { onChange(l.code); setOpen(false); }} style={optionStyle(l.code)}>
-              {l.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function LandingPreview() {
@@ -226,19 +87,6 @@ export default function LandingPreview() {
     router.push("/");
   };
 
-  const handleLanguageChange = async (type: "native" | "learning", code: string) => {
-    if (type === "native") setNativeLanguage(code);
-    else setLearningLanguage(code);
-    localStorage.setItem(type === "native" ? "balaka_native_language" : "balaka_learning_language", code);
-    const { data } = await supabase.auth.getSession();
-    if (data.session) {
-      await supabase
-        .from("profiles")
-        .update(type === "native" ? { native_language: code } : { learning_language: code })
-        .eq("id", data.session.user.id);
-    }
-  };
-
   return (
     <>
       {/* ================= HEADER ================= */}
@@ -256,10 +104,6 @@ export default function LandingPreview() {
           </nav>
           {!loading && (
             <div className="header-actions">
-              <div className="lang-pills" style={{ display: "flex", gap: 10 }}>
-                <LandingLanguageDropdown label="I learn" value={learningLanguage} onChange={(c) => handleLanguageChange("learning", c)} />
-                <LandingLanguageDropdown label="I know" value={nativeLanguage} onChange={(c) => handleLanguageChange("native", c)} />
-              </div>
               {isAuthenticated ? (
                 <>
                   <Link href="/account" className="button outline small">My account</Link>
@@ -350,30 +194,43 @@ export default function LandingPreview() {
           <div className="mode-card">
             <div className="mode-top">
               <span className="mode-icon">Aa</span>
-              <span className="tag">For confident readers</span>
+              <span className="tag">The author&apos;s words</span>
             </div>
-            <h3>Read the original</h3>
-            <p>The author&apos;s text stays unchanged, with translation and explanations exactly when you need them.</p>
+            <p className="kicker" style={{ marginTop: 18 }}>Original</p>
+            <h3>Read the text as it was written</h3>
+            <p>Keep the author&apos;s language and style, with translation and explanations available whenever you need them.</p>
             <div className="text-sample">
-              <p>&ldquo;In my younger and more vulnerable years, my father gave me some advice that I have been turning over in my mind ever since.&rdquo;</p>
+              <p>&ldquo;Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, “and what is the use of a book,” thought Alice “without pictures or conversations?”&rdquo;</p>
+            </div>
+            <div className="mode-footer">
+              <small>The original text is ready to read — no upload required.</small>
+              <Link href="/reader/c12739df-67a3-41cc-9a20-039d96385a8d" className="button small">
+                Read the original →
+              </Link>
             </div>
           </div>
 
           <div className="mode-card adapted">
             <div className="mode-top">
               <span className="mode-icon sparkle">+</span>
-              <span className="tag">Easier to start</span>
+              <span className="tag">Clearer language</span>
             </div>
-            <h3>Create an adaptation</h3>
-            <p>Clearer wording and shorter paragraphs, while preserving the meaning and story.</p>
+            <p className="kicker" style={{ marginTop: 18 }}>Retelling</p>
+            <h3>Follow the same story more easily</h3>
+            <p>Read an adapted retelling with clearer wording and simpler sentences while the central meaning stays intact.</p>
             <div className="text-sample">
-              <p>&ldquo;When I was younger, my father gave me advice. I have remembered it ever since.&rdquo;</p>
+              <p>&ldquo;Alice sat by her sister on the bank, but she was bored. Her sister was reading a book with no pictures or conversations. Alice wondered why anyone would read such a dull book.&rdquo;</p>
+            </div>
+            <div className="mode-footer">
+              <small>We&apos;ve already prepared an adapted version for easier reading.</small>
+              <Link href="/reader/5edfe290-b9c8-4b0b-9241-87a7b3be92ee" className="button small">
+                Read the retelling →
+              </Link>
             </div>
           </div>
 
           <span className="or-badge">or</span>
         </div>
-        <p className="mode-note">↺ Return to the original whenever you feel ready.</p>
       </section>
 
       {/* ================= HOW IT WORKS STEPS ================= */}
@@ -660,7 +517,7 @@ export default function LandingPreview() {
               <li><CheckIcon />Everything in Free</li>
               <li><CheckIcon />Upload your own texts — .txt, .epub, or .pdf</li>
               <li><CheckIcon />Simplified retelling of uploaded texts</li>
-              <li><CheckIcon />Up to 2,000,000 characters processed per month</li>
+              <li><CheckIcon />Up to 2,000,000 characters (more than 500 pages)</li>
               <li><CheckIcon />Unlimited saved words</li>
             </ul>
           </div>
