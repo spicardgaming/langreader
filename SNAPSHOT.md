@@ -4,7 +4,7 @@ _Last updated: July 2026_
 ## Current status
 Stage 4 complete. UI/UX improvements done. Language switcher implemented and working. Upgrade/Cancel Pro subscription flow implemented and tested end-to-end (checkout, webhook, in-app cancellation, and direct-in-Stripe cancellation). Reading progress now syncs to Supabase for logged-in users (cross-device), tested and confirmed working. `/api/retell` and `/api/format` migrated off Vercel to a standalone server on Railway, tested end-to-end in production with large books. Monthly/per-file character limits reworked (1M → 2M, plus a one-time "grace pass" and a hard per-file cap) — see DOCS.md Section 16 for the cost reasoning. epub and PDF upload/extraction implemented and tested end-to-end in production on langreader.vercel.app (extraction, Read original, Create retelling, both formats) — see DOCS.md Section 16b.
 
-Real launch is approaching. Concurrency hardening (retry-with-backoff, orphaned-job cleanup, processing concurrency limit) is now implemented and deployed. Legal pages (Privacy Policy, Terms of Service) are live and linked from the footer. Pricing raised to $6.99/month (or $69.99/year) — see "Pricing update" below. Language architecture overhaul and upload consolidation to `/account` are done. Stripe is still running in test mode (no real payments yet), so switching Vercel to the Pro plan isn't urgent this moment — but it's still required before flipping Stripe to live mode, since Hobby's terms prohibit commercial/paid use (confirmed directly from Vercel's current terms). Homepage → landing page redesign is complete and merged into `app/page.tsx` — see "Homepage → landing page ✅" below.
+Real launch is approaching. Concurrency hardening (retry-with-backoff, orphaned-job cleanup, processing concurrency limit) is now implemented and deployed. Legal pages (Privacy Policy, Terms of Service) are live and linked from the footer. Pricing raised to $6.99/month (or $69.99/year) — see "Pricing update" below. Language architecture overhaul and upload consolidation to `/account` are done. Stripe is still running in test mode (no real payments yet), so switching Vercel to the Pro plan isn't urgent this moment — but it's still required before flipping Stripe to live mode, since Hobby's terms prohibit commercial/paid use (confirmed directly from Vercel's current terms). Homepage → landing page redesign is complete and merged into `app/page.tsx` — see "Homepage → landing page ✅" below. `/account` is now split into three real tabs (Books / Vocabulary / Profile) with a full vocabulary/collections feature built from scratch — see "My vocabulary ✅" below.
 
 Full UI internationalization is intentionally postponed — interface stays English-only for now. PWA is planned as the final step, after all other plan items are done.
 
@@ -193,6 +193,29 @@ Sample text changed to a real book already in the library (Alice in Wonderland �
 
 The `.or-badge` circle's positioning had to be reworked for this: it was originally `position:absolute` at a fixed `top:%` computed against the whole comparison block's height, which broke as soon as the cards grew taller with the new footer content added. Replaced with `position:static` plus CSS `order`, letting it sit in normal document flow exactly at the boundary between the two cards (with a small negative margin to visually overlap the seam) — this stays correct regardless of how tall the cards end up being, unlike the percentage-based version.
 
+### My vocabulary ✅
+Full rebuild of the old "My cards" list into a dedicated `/account/vocabulary` page with collections, bulk actions, and manual card creation — built from a design spec + HTML/CSS mockup (from the same visual language as the landing page: `#173f35` green, `#e7eccf`/lime accents, Georgia headings), adapted the same way as the landing (concrete CSS values instead of the mockup's own foreign design-token system, which isn't present in this app).
+
+**Restructured `/account` into three tabs.** Originally a single long page (email/plan, upload form, book grid, cards list) that kept growing with every new feature — split into `Books` (`/account`), `Vocabulary` (`/account/vocabulary`), and `Profile` (`/account/profile`), navigated via a small shared `AccountTabs.tsx` component (active tab highlighted by `usePathname`). The email/subscription block moved entirely to the new Profile page rather than staying "always visible above tabs" as first proposed — Aleks's call, and the better one: it avoids duplicating the profile fetch/Upgrade/Cancel/Resume logic across pages, and gives three clean, equally-weighted destinations instead of two tabs plus a persistent settings block. `success_url` in `checkout/route.ts` updated to `/account/profile?success=true` to match.
+
+**Data model:**
+- `cards` gained `book_id` (FK to `books`, `on delete set null`), `book_title` (a point-in-time snapshot, so the source caption survives even if the book itself is later deleted), and `language`
+- New `collections` table (`id`, `user_id`, `name`, unique per user) and `card_collections` join table (`card_id`, `collection_id`) — many-to-many, since one card can belong to several collections. "All saved" and "No collection" are computed views, not real rows.
+- `Reader.tsx` takes a new required `bookId` prop; `handleSaveCard` now writes `book_id`/`book_title`/`language` alongside the existing fields. Both reader pages (`/reader/[id]`, `/account/reader/[id]`) pass `bookId={book.id}`.
+
+**Scope deliberately narrowed from the original spec, agreed upfront:**
+- No source-level "chapter" tracking — the app has no chapter concept (only page-of-10-paragraphs), so the source caption is just the book title, not `Book · Chapter N`.
+- No pronunciation/audio button — depends on the not-yet-built TTS feature; stays on the roadmap, not part of this pass.
+- "Undo" after delete implemented as a **client-side delayed commit** (cards disappear from view immediately, actual `DELETE` only fires after a 5-second window with no "Undo" click), not a database-level soft-delete (`deleted_at` column) — avoids new schema/infrastructure for a UX-only feature.
+- Delete confirmation uses the existing app-wide `window.confirm()` convention (native OK/Cancel buttons) rather than a custom-labeled dialog, for consistency with how confirmations already work elsewhere (e.g. cancel subscription) — not a pixel-perfect match to the spec's custom "Cancel/Delete" button labels.
+
+**Built in five stages (3.1 → 3.5), each confirmed working before the next:**
+1. Route, card loading, collapsed/expanded list — no sidebar, no selection, no dialog yet. Expand arrow only shown when a card actually has example data (phrase-type cards saved via the reader currently have none — a real, pre-existing data gap, not a bug introduced here).
+2. Collections sidebar (desktop) + `<select>` fallback (mobile, `≤740px`) with per-collection counts, "New collection" creation with duplicate-name handling (relies on the `unique(user_id, name)` DB constraint). Initially placed the creation UI at the bottom of the sidebar; moved to a full-width row directly under the header per feedback, matching the mockup's actual header-level placement — clicking a collection with cards that haven't been explicitly assigned yet (which, before step 3, is *all* of them) correctly shows 0/empty, not a bug.
+3. Type filter (All types/Words/Phrases, shown only inside "All saved"), card selection (checkbox visually secondary, doesn't trigger expand; chevron doesn't trigger selection), selection count, Actions menu (disabled until something is selected; closes on outside click or `Esc`) with Move to collection (clears all existing memberships first, then assigns the target — matches spec's "from All saved/No collection, just assigns"), Add to another collection (additive, uses `upsert` with `ignoreDuplicates` to avoid unique-constraint errors), and Delete selected with the delayed-commit Undo described above.
+4. "Add word or phrase" dialog — Type/Collection/Word/Translation/Example fields, collection pre-selected when opened from within a real collection, "Create new collection" as its own inline row under the dropdown rather than an in-list option (plain `<select>` handles a special "create new" entry poorly, especially for keyboard/screen-reader use). Duplicate detection on blur (case-insensitive exact match on `word`) shows a non-blocking warning with a "View existing card" link that switches to "All saved" and scrolls the matching card into view (`id="card-{id}"` added to each card for this). Manually-added cards have no transcription and at most a single unband-translated example sentence — expanded view only renders a translation line when one actually exists, rather than showing a blank line.
+5. Pagination (20/page, same ellipsis pattern already used for the reader's own pagination, page-change scrolls to the list's own top rather than the site's top, selection clears, current collection/filter persist, clamps to the last valid page if filtering/deleting shrank the list below the current page number), empty states matched to the spec's exact copy with actionable buttons ("Add word or phrase" / "Show all types" as appropriate), and mobile polish (toolbar wraps instead of overflowing, tighter dialog padding on small screens).
+
 ### epub & PDF upload ✅
 - New private Supabase Storage bucket `book-sources`, RLS-scoped so each user can only access their own uploaded files (path prefix `${userId}/...`)
 - New `books.source_path` column, pointing to the raw uploaded file in that bucket
@@ -312,7 +335,28 @@ DOCS.md
 | transcription | text | |
 | examples | jsonb | `{english, russian}` — key names kept for compatibility even though "english" now holds the learning-language example |
 | type | text | 'word' or 'phrase' |
+| book_id | uuid | FK → `books`, `on delete set null` — the book stays deletable without breaking the card |
+| book_title | text | snapshot of the book's title at the time the card was saved; survives even if `book_id` later goes null |
+| language | text | not yet used for anything (озвучка groundwork), but populated going forward |
 | created_at | timestamptz | |
+
+### `collections`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| user_id | uuid | |
+| name | text | unique per `user_id` |
+| created_at | timestamptz | |
+
+"All saved" and "No collection" are computed views on `/account/vocabulary`, not rows in this table.
+
+### `card_collections`
+| Column | Type | Notes |
+|--------|------|-------|
+| card_id | uuid | FK → `cards`, `on delete cascade`, part of composite PK |
+| collection_id | uuid | FK → `collections`, `on delete cascade`, part of composite PK |
+
+Many-to-many — one card can belong to several collections at once.
 
 ### `profiles`
 | Column | Type | Notes |

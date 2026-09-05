@@ -4,16 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { callProcessingApi } from "@/lib/processing";
-
-type Card = {
-  id: string;
-  word: string;
-  translation: string;
-  type: "word" | "phrase";
-  created_at: string;
-  transcription: string;
-  examples: Array<{ english: string; russian: string }>;
-};
+import AccountTabs from "@/app/components/AccountTabs";
 
 type Book = {
   id: string;
@@ -71,17 +62,10 @@ function UploadIcon() {
 
 export default function AccountPage() {
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cards, setCards] = useState<Card[]>([]);
-  const [cardsLoading, setCardsLoading] = useState(true);
   const [books, setBooks] = useState<Book[]>([]);
   const [booksLoading, setBooksLoading] = useState(true);
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
-  const [profile, setProfile] = useState<{ plan: string; subscription_cancel_at: string | null } | null>(null);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [cancelState, setCancelState] = useState<"idle" | "cancelling">("idle");
 
   // Upload text section
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,21 +90,8 @@ export default function AccountPage() {
         return;
       }
 
-      setUserEmail(data.session.user.email || null);
       setUserId(data.session.user.id);
       setLoading(false);
-
-      // Load user profile (plan)
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("plan, subscription_cancel_at")
-        .eq("id", data.session.user.id)
-        .single();
-
-      if (profileData) {
-        setProfile(profileData);
-      }
-
 
       // Load user books
       const { data: booksData, error: booksError } = await supabase
@@ -133,18 +104,6 @@ export default function AccountPage() {
         setBooks(booksData);
       }
       setBooksLoading(false);
-
-      // Load user cards
-      const { data: cardsData, error } = await supabase
-        .from("cards")
-        .select("*")
-        .eq("user_id", data.session.user.id)
-        .order("created_at", { ascending: false });
-
-      if (!error && cardsData) {
-        setCards(cardsData);
-      }
-      setCardsLoading(false);
     }
 
     checkSession();
@@ -609,106 +568,6 @@ const handleReadOriginal = async (bookId: string) => {
     return `${day}.${month}.${year}`;
   };
 
-  const handleUpgrade = async () => {
-    if (!userId) return;
-    setCheckoutLoading(true);
-    try {
-      const response = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          priceId: process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID,
-          userId,
-          email: userEmail,
-        }),
-      });
-      const data = await response.json();
-      if (data.url) window.location.href = data.url;
-    } catch (error) {
-      console.error('Checkout error:', error);
-    } finally {
-      setCheckoutLoading(false);
-    }
-  };
-
-  const handleCancelSubscription = async () => {
-    if (!userId) return;
-
-    const confirmed = window.confirm(
-      "Are you sure you want to cancel your Pro subscription? You'll keep Pro access until the end of your current billing period, and it won't renew after that."
-    );
-    if (!confirmed) return;
-
-    setCancelState("cancelling");
-
-    try {
-      const response = await fetch('/api/stripe/cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
-
-      if (response.ok) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("plan, subscription_cancel_at")
-          .eq("id", userId)
-          .single();
-
-        if (profileData) {
-          setProfile(profileData);
-        }
-        window.alert("Your subscription will end at the close of your current billing period. You'll keep Pro access until then.");
-      } else {
-        window.alert("Something went wrong. Please try again or contact support.");
-      }
-    } catch (error) {
-      console.error('Cancel subscription error:', error);
-      window.alert("Something went wrong. Please try again or contact support.");
-    } finally {
-      setCancelState("idle");
-    }
-  };
-
-  const handleResumeSubscription = async () => {
-    if (!userId) return;
-
-    setCancelState("cancelling");
-
-    try {
-      const response = await fetch('/api/stripe/resume', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
-
-      if (response.ok) {
-        setProfile((prev) => (prev ? { ...prev, subscription_cancel_at: null } : prev));
-        window.alert("Your subscription has been resumed. It will continue as normal.");
-      } else {
-        window.alert("Something went wrong. Please try again or contact support.");
-      }
-    } catch (error) {
-      console.error('Resume subscription error:', error);
-      window.alert("Something went wrong. Please try again or contact support.");
-    } finally {
-      setCancelState("idle");
-    }
-  };
-
-  const toggleCardExpansion = (cardId: string) => {
-
-    setExpandedCards((prev) => {
-      const next = new Set(prev);
-      if (next.has(cardId)) {
-        next.delete(cardId);
-      } else {
-        next.add(cardId);
-      }
-      return next;
-    });
-  };
-
   if (loading) {
 
     return (
@@ -732,56 +591,7 @@ const handleReadOriginal = async (bookId: string) => {
   return (
 
     <>
-          <h1 className="mb-6 text-2xl font-semibold text-[#1a1a1a]">
-            My account
-          </h1>
-
-          <div className="mb-8 flex flex-col gap-4 rounded-lg border border-[#e7e5e4] bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-[#78716c]">Email:</p>
-              <p className="mt-1 text-base text-[#1a1a1a]">{userEmail}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              {profile?.plan === 'free' && (
-                <button
-                  onClick={handleUpgrade}
-                  disabled={checkoutLoading}
-                  className="rounded bg-[#2c2c2c] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-                >
-                  {checkoutLoading ? 'Loading...' : 'Upgrade to read your texts'}
-                </button>
-              )}
-              {profile?.plan === 'pro' && !profile.subscription_cancel_at && (
-                <button
-                  onClick={handleCancelSubscription}
-                  disabled={cancelState === 'cancelling'}
-                  className="text-sm text-[#78716c] underline hover:text-[#1a1a1a] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {cancelState === 'cancelling' ? 'Cancelling...' : 'Cancel Pro account'}
-                </button>
-              )}
-              {profile?.plan === 'pro' && profile.subscription_cancel_at && (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-[#78716c]">
-                    Pro (cancels on{' '}
-                    {new Date(profile.subscription_cancel_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                    )
-                  </span>
-                  <button
-                    onClick={handleResumeSubscription}
-                    disabled={cancelState === 'cancelling'}
-                    className="text-sm text-[#1a1a1a] underline hover:opacity-70 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {cancelState === 'cancelling' ? 'Resuming...' : 'Resume subscription'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          <AccountTabs />
 
           <section className="mb-8">
             <button
@@ -1053,96 +863,6 @@ const handleReadOriginal = async (bookId: string) => {
                 ))}
               </div>
 
-            )}
-          </section>
-
-          <section className="mb-8">
-            <h2 className="mb-4 text-lg font-medium text-[#1a1a1a]">
-              My cards
-            </h2>
-            {cardsLoading ? (
-              <div className="rounded-lg border border-[#e7e5e4] bg-white p-8 text-center">
-                <p className="text-sm text-[#78716c]">Loading...</p>
-              </div>
-            ) : cards.length === 0 ? (
-              <div className="rounded-lg border border-[#e7e5e4] bg-white p-8 text-center">
-                <p className="text-sm text-[#78716c]">Nothing here yet</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {cards.map((card) => {
-                  const isExpanded = expandedCards.has(card.id);
-                  
-                  return (
-                    <div
-                      key={card.id}
-                      onClick={() => toggleCardExpansion(card.id)}
-                      className={`cursor-pointer transition-all duration-200 ${
-                        isExpanded
-                          ? "rounded-lg border border-[#e0e0e0] bg-white px-6 py-5"
-                          : "rounded-lg border border-[#e7e5e4] bg-white p-4"
-                      }`}
-                      style={isExpanded ? { boxShadow: "0 4px 20px rgba(0,0,0,0.15)" } : undefined}
-                    >
-                      {isExpanded ? (
-                        // EXPANDED STATE
-                        <>
-                          <div className="flex items-start justify-between gap-4">
-                            <p className="text-base font-bold text-[#1a1a1a]">
-                              {card.word}
-                            </p>
-                            <span className="shrink-0 text-[#a8a29e]">
-                              <ChevronIcon up={true} />
-                            </span>
-                          </div>
-                          <p className="mt-2 text-base text-[#1a1a1a]">
-                            {card.translation}
-                          </p>
-                          {card.transcription && (
-                            <p className="mt-1 text-sm italic text-[#8a8580]">
-                              {card.transcription}
-                            </p>
-                          )}
-                          {card.examples && card.examples.length > 0 && (
-                            <div className="mt-3 border-t border-[#e8e6e1] pt-3">
-                              {card.examples.slice(0, 2).map((example, idx) => (
-                                <div key={idx} className={idx > 0 ? "mt-3" : ""}>
-                                  <p className="text-sm leading-snug text-[#333]">
-                                    {example.english}
-                                  </p>
-                                  <p className="mt-0.5 text-sm leading-snug text-[#8a8580]">
-                                    {example.russian}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        // COLLAPSED STATE
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="text-base font-semibold text-[#1a1a1a]">
-                                {card.word}
-                              </p>
-                              <span className="rounded bg-[#f5f5f5] px-2 py-0.5 text-xs text-[#78716c]">
-                                {card.type === "word" ? "слово" : "фраза"}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-sm text-[#57534e]">
-                              {card.translation}
-                            </p>
-                          </div>
-                          <span className="shrink-0 text-[#a8a29e]">
-                            <ChevronIcon up={false} />
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
             )}
           </section>
     </>

@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/account?success=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/account/profile?success=true`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
       metadata: {
         userId,

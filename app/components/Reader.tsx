@@ -74,6 +74,7 @@ type ReaderProps = {
   title: string;
   paragraphs: string[];
   bookLanguage: string;
+  bookId: string;
 };
 
 const POPUP_GAP = 8;
@@ -322,7 +323,7 @@ function expandRangeToPhraseBounds(
   return setRangeOffsets(paragraph, phraseStart, phraseEnd);
 }
 
-export default function Reader({ title, paragraphs, bookLanguage }: ReaderProps) {
+export default function Reader({ title, paragraphs, bookLanguage, bookId }: ReaderProps) {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [popup, setPopup] = useState<PopupState | null>(null);
@@ -422,6 +423,9 @@ export default function Reader({ title, paragraphs, bookLanguage }: ReaderProps)
         examples: popup.isPhrase
           ? []
           : popup.wordData?.examples || [],
+        book_id: bookId,
+        book_title: title,
+        language: bookLanguage,
       };
 
       const { error } = await supabase.from("cards").insert(cardData);

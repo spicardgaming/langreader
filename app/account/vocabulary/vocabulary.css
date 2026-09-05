@@ -1,0 +1,189 @@
+/* Balaka — My vocabulary page styles.
+   Adapted from a design mockup that relied on an external design-token system
+   (a "Visualizer"-style component framework) not present in this app. Colors,
+   radii, and spacing below are the same *computed* values from that mockup,
+   just written as plain values instead of var() references to tokens we don't
+   have — avoids silently-undefined-variable bugs. Scoped under .vocab-page so
+   nothing here can leak into the rest of the site, which uses Tailwind utilities.
+*/
+
+.vocab-page{
+  font-family:Arial,Helvetica,sans-serif;
+  color:#20312b;
+}
+.vocab-page h1,.vocab-page h2,.vocab-page h3{
+  font-family:Georgia,'Times New Roman',serif;
+  font-weight:400;
+}
+
+/* ---- Header ---- */
+.vocab-header{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:24px;flex-wrap:wrap}
+.vocab-header h1{margin:0 0 6px;font-size:26px}
+.vocab-header p{margin:0;color:#68736e;font-size:14px}
+.vocab-header-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---- Layout: sidebar + main ---- */
+.vocab-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:28px}
+.vocab-sidebar{padding-right:20px;border-right:1px solid #d9d5ca}
+.vocab-side-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:13px}
+.vocab-collections{display:grid;gap:4px}
+.vocab-collection{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
+  border:1px solid transparent;background:transparent;border-radius:10px;padding:8px 10px;
+  font-size:13px;color:#20312b;cursor:pointer;text-align:left;
+}
+.vocab-collection:hover{background:#f2f0e6}
+.vocab-collection.is-current{background:#173f35;color:#fff}
+.vocab-collection span{display:flex;align-items:center;gap:8px}
+.vocab-collection small{color:inherit;opacity:.7}
+.vocab-new-row-standalone{
+  display:flex;gap:8px;padding:14px 16px;margin-bottom:20px;align-items:center;
+}
+.vocab-new-row-standalone input{
+  flex:1;min-height:36px;padding:0 12px;border:1px solid #c9c6bc;border-radius:10px;
+  background:#fffdf8;color:#20312b;font-size:13px;
+}
+.vocab-mobile-collection{display:none;margin-bottom:16px}
+.vocab-mobile-collection select{
+  width:100%;min-height:38px;padding:0 10px;border:1px solid #c9c6bc;border-radius:10px;
+  background:#fffdf8;color:#20312b;font-size:13px;
+}
+.vocab-list-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.vocab-list-head h2{margin:0;font-size:18px}
+
+/* ---- Type filter (nav pills) ---- */
+.vocab-type-filter{display:flex;gap:4px}
+.vocab-type-pill{
+  border:1px solid transparent;background:transparent;border-radius:8px;padding:6px 12px;
+  font-size:12px;color:#68736e;cursor:pointer;
+}
+.vocab-type-pill:hover{background:#f2f0e6}
+.vocab-type-pill.active{background:#eef0e8;color:#20312b}
+
+/* ---- Toolbar / selection / Actions ---- */
+.vocab-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;position:relative}
+.vocab-toolbar-left{display:flex;align-items:center;gap:10px;position:relative}
+.vocab-selected-count{font-size:13px;color:#68736e}
+.vocab-visible-count{font-size:13px;color:#68736e}
+.vocab-actions-menu{
+  position:absolute;left:0;top:calc(100% + 6px);z-index:8;width:230px;padding:6px;
+  background:#fffdf8;border:1px solid #d9d5ca;border-radius:12px;
+  box-shadow:0 12px 30px rgba(32,49,43,.14);display:grid;gap:2px;
+}
+.vocab-actions-menu .vocab-btn{justify-content:flex-start;width:100%;border:0}
+.vocab-actions-menu .vocab-danger{color:#a13b2c}
+.vocab-actions-menu .vocab-danger:hover{background:#fbeae6}
+.vocab-menu-empty{margin:6px 10px;font-size:12px;color:#68736e}
+
+/* ---- Checkbox ---- */
+.vocab-entry-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center}
+.vocab-check{position:relative;display:grid;place-items:center;width:32px;height:32px;cursor:pointer}
+.vocab-select{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.vocab-check-circle{
+  display:grid;place-items:center;width:15px;height:15px;border:1px solid #929c97;
+  border-radius:50%;background:#fffdf8;color:#fff;
+}
+.vocab-select:checked + .vocab-check-circle{border-color:#173f35;background:#173f35}
+.vocab-check:focus-within .vocab-check-circle{box-shadow:0 0 0 2px rgba(23,63,53,.18)}
+.vocab-entry.is-selected{background:#f2f3e9;box-shadow:inset 2px 0 0 #718653}
+.vocab-entry-buttons{
+  background:transparent;border:0;color:#a39c86;cursor:pointer;padding:4px;display:flex;align-items:center;
+}
+
+/* ---- Undo toast ---- */
+.vocab-toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:40;
+  display:flex;align-items:center;gap:16px;padding:12px 18px;border-radius:12px;
+  background:#173f35;color:#fff;font-size:13px;box-shadow:0 12px 30px rgba(0,0,0,.25);
+}
+.vocab-toast-undo{background:transparent;border:0;color:#ddea9d;font-weight:600;cursor:pointer;font-size:13px}
+.vocab-toast-undo:hover{text-decoration:underline}
+.vocab-toast-success{background:#173f35}
+
+/* ---- Pagination ---- */
+.vocab-pagination{display:flex;justify-content:center;align-items:center;gap:4px;margin-top:24px;flex-wrap:wrap}
+.vocab-page-ellipsis{padding:0 4px;color:#a39c86;font-size:13px}
+.vocab-page.is-current{background:#173f35;color:#fff;border-color:transparent}
+
+/* ---- Add word/phrase dialog ---- */
+.vocab-overlay{
+  position:fixed;inset:0;z-index:30;display:flex;align-items:flex-start;justify-content:center;
+  padding:70px 20px;background:rgba(31,45,39,.42);
+}
+.vocab-dialog{width:min(520px,100%);padding:24px}
+.vocab-dialog-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.vocab-dialog-head h3{margin:0;font-size:18px}
+.vocab-form{display:grid;gap:14px}
+.vocab-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.vocab-form-label{display:block;font-size:13px;color:#20312b}
+.vocab-form-label input,.vocab-form-label select,.vocab-form-label textarea{
+  display:block;width:100%;margin-top:6px;min-height:36px;padding:0 10px;
+  border:1px solid #c9c6bc;border-radius:10px;background:#fffdf8;color:#20312b;font-size:13px;
+}
+.vocab-form-label textarea{padding:8px 10px;resize:vertical}
+.vocab-optional{color:#a39c86;font-weight:400}
+.vocab-inline-create{display:flex;gap:8px}
+.vocab-inline-create input{
+  flex:1;min-height:34px;padding:0 10px;border:1px solid #c9c6bc;border-radius:10px;
+  background:#fffdf8;color:#20312b;font-size:12px;
+}
+.vocab-duplicate-warning{
+  padding:10px 12px;border-radius:10px;background:#fbeae6;color:#7a3223;font-size:12px;
+}
+.vocab-link-button{background:none;border:0;padding:0;color:#7a3223;text-decoration:underline;cursor:pointer;font-size:12px}
+.vocab-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+
+@media(max-width:740px){
+  .vocab-form-row{grid-template-columns:1fr}
+}
+
+/* ---- Buttons (shared visual language with the landing page) ---- */
+.vocab-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:36px;padding:0 16px;border-radius:10px;border:1px solid #c9c6bc;
+  background:#fffdf8;color:#20312b;font-size:13px;cursor:pointer;white-space:nowrap;
+  text-decoration:none;
+}
+.vocab-btn:hover:not(:disabled){background:#f2f0e6}
+.vocab-btn:disabled{cursor:not-allowed;opacity:.4}
+.vocab-btn-primary{border-color:transparent;background:#173f35;color:#fff}
+.vocab-btn-primary:hover:not(:disabled){background:#20554a}
+.vocab-btn-ghost{border-color:transparent;background:transparent;color:#68736e}
+.vocab-btn-ghost:hover:not(:disabled){color:#20312b;background:#f2f0e6}
+
+/* ---- Card (generic container) ---- */
+.vocab-card{
+  border-radius:16px;background:#fffdf8;border:1px solid #d9d5ca;
+}
+
+/* ---- Vocabulary list ---- */
+.vocab-list{display:grid;gap:10px}
+.vocab-entry{padding:17px 19px}
+.vocab-title h3{margin:0;font-size:16px}
+.vocab-translation{margin:5px 0 0;font-size:14px;color:#20312b}
+.vocab-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;color:#68736e;font-size:12px}
+.vocab-category{background:#e7eccf;color:#365239;padding:3px 8px;border-radius:999px}
+.vocab-source{display:flex;align-items:center;gap:5px}
+.vocab-expanded{margin-top:17px;padding-top:17px;border-top:1px solid #dedbd2}
+.vocab-context{padding:16px 18px;border-left:3px solid #7f9b42;background:#f1f3e8;border-radius:0 10px 10px 0}
+.vocab-context p{margin:0 0 7px;font-family:Georgia,'Times New Roman',serif;font-size:15px}
+.vocab-context p:last-child{margin:0;color:#707a75;font-family:Arial,Helvetica,sans-serif;font-size:13px}
+.vocab-chevron{transition:transform .15s ease}
+.vocab-entry.is-open .vocab-chevron{transform:rotate(180deg)}
+
+/* Empty / loading states */
+.vocab-empty{padding:48px 24px;text-align:center;color:#68736e}
+
+@media(max-width:740px){
+  .vocab-header{flex-direction:column;align-items:flex-start}
+  .vocab-header-actions{width:100%}
+  .vocab-header-actions .vocab-btn-primary{flex:1}
+  .vocab-entry-head{gap:10px}
+  .vocab-layout{grid-template-columns:1fr}
+  .vocab-sidebar{display:none}
+  .vocab-mobile-collection{display:block}
+  .vocab-toolbar{flex-wrap:wrap;align-items:flex-start}
+  .vocab-toolbar-left{flex-wrap:wrap}
+  .vocab-overlay{padding:24px 14px}
+  .vocab-dialog{padding:18px}
+}
