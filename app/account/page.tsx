@@ -596,7 +596,7 @@ const handleReadOriginal = async (bookId: string) => {
           <section className="mb-8">
             <button
               onClick={() => setShowUploadForm((prev) => !prev)}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#2c2c2c] px-5 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-full bg-[#173f35] px-5 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
               <UploadIcon />
               Upload text
@@ -749,7 +749,7 @@ const handleReadOriginal = async (bookId: string) => {
                   type="button"
                   onClick={handleUploadText}
                   disabled={isUploading || !uploadTitle.trim() || !selectedFile}
-                  className="rounded bg-[#2c2c2c] px-6 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  className="rounded-full bg-[#173f35] px-6 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {isUploading ? 'Uploading...' : 'Upload'}
                 </button>
@@ -840,7 +840,7 @@ const handleReadOriginal = async (bookId: string) => {
                         </>
                       )}
                       {book.status === 'done' && (
-                        <a href={`/account/reader/${book.id}`} className="rounded bg-[#2c2c2c] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 w-full text-center">
+                        <a href={`/account/reader/${book.id}`} className="rounded-full bg-[#173f35] px-3 py-1.5 text-xs font-medium !text-white transition-opacity hover:opacity-90 w-full text-center">
                           Read
                         </a>
                       )}
@@ -856,7 +856,7 @@ const handleReadOriginal = async (bookId: string) => {
     )}
   </div>
 )}
-                      <button onClick={() => handleDeleteBook(book.id, book.title)} className="text-[10px] text-[#dc2626] hover:text-[#b91c1c] transition-colors text-left mt-1">Delete</button>
+                      <button onClick={() => handleDeleteBook(book.id, book.title)} className="cursor-pointer text-[10px] text-[#dc2626] hover:text-[#b91c1c] hover:underline transition-colors text-left mt-1">Delete</button>
                     </div>
                     </div>
                   </div>
