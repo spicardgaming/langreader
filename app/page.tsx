@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -15,11 +15,118 @@ import "./landing.css";
      public/landing/favicon.svg
 */
 
+const LIBRARY_LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Spanish" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "it", label: "Italian" },
+  { code: "pt", label: "Portuguese" },
+  { code: "ru", label: "Russian" },
+  { code: "uk", label: "Ukrainian" },
+  { code: "ca", label: "Catalan" },
+  { code: "zh", label: "Chinese" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "ar", label: "Arabic" },
+  { code: "hi", label: "Hindi" },
+  { code: "tr", label: "Turkish" },
+  { code: "pl", label: "Polish" },
+  { code: "nl", label: "Dutch" },
+  { code: "vi", label: "Vietnamese" },
+  { code: "th", label: "Thai" },
+  { code: "id", label: "Indonesian" },
+  { code: "bn", label: "Bengali" },
+  { code: "fa", label: "Persian" },
+  { code: "he", label: "Hebrew" },
+  { code: "ur", label: "Urdu" },
+  { code: "ro", label: "Romanian" },
+  { code: "hu", label: "Hungarian" },
+  { code: "cs", label: "Czech" },
+  { code: "sk", label: "Slovak" },
+  { code: "bg", label: "Bulgarian" },
+  { code: "el", label: "Greek" },
+  { code: "sv", label: "Swedish" },
+  { code: "no", label: "Norwegian" },
+  { code: "da", label: "Danish" },
+  { code: "fi", label: "Finnish" },
+  { code: "sr", label: "Serbian" },
+  { code: "hr", label: "Croatian" },
+  { code: "ms", label: "Malay" },
+  { code: "sw", label: "Swahili" },
+  { code: "az", label: "Azerbaijani" },
+  { code: "ka", label: "Georgian" },
+  { code: "hy", label: "Armenian" },
+];
+
 function ArrowIcon() {
   return <img src="/landing/arrow.svg" alt="" width={16} height={16} />;
 }
 function CheckIcon() {
   return <img src="/landing/check.svg" alt="" width={16} height={16} />;
+}
+
+/* Language filter for the "Not sure where to begin?" library preview.
+   Deliberately local/ephemeral: changes what's shown in this one section only —
+   does NOT write to localStorage or the user's profile, so casually browsing
+   another language's catalog here never silently overwrites someone's real
+   "I learn" setting. */
+function LibraryLanguageSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = LIBRARY_LANGUAGES.find((l) => l.code === value);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="lib-lang">
+      <button className="lib-lang-trigger" onClick={() => setOpen((o) => !o)}>
+        {selected?.label || "English"}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="lib-lang-menu">
+          {LIBRARY_LANGUAGES.map((l) => (
+            <button
+              key={l.code}
+              className={`lib-lang-option${l.code === value ? " is-selected" : ""}`}
+              onClick={() => { onChange(l.code); setOpen(false); }}
+            >
+              {l.label}
+              {l.code === value && <CheckIcon />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Cover background palette. Text color is never hardcoded against these —
+// see getReadableTextColor — so adding a new tone here can never accidentally
+// produce unreadable title text.
+const COVER_TONES = ["#957c3e", "#914f3f", "#59747b", "#304b3e", "#5b4b7a", "#3d6b63"];
+
+function getReadableTextColor(hexBg: string): string {
+  const r = parseInt(hexBg.slice(1, 3), 16);
+  const g = parseInt(hexBg.slice(3, 5), 16);
+  const b = parseInt(hexBg.slice(5, 7), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? "#2b2b23" : "#faf6e9";
 }
 
 export default function LandingPreview() {
@@ -29,7 +136,7 @@ export default function LandingPreview() {
   const [nativeLanguage, setNativeLanguage] = useState("ru");
   const [learningLanguage, setLearningLanguage] = useState("en");
   const [libraryBooks, setLibraryBooks] = useState<
-    { id: string; title: string; cover_url: string | null }[]
+    { id: string; title: string; author: string | null; tagline: string | null; type: "original" | "retelling" }[]
   >([]);
   const [libraryLoading, setLibraryLoading] = useState(true);
 
@@ -68,7 +175,7 @@ export default function LandingPreview() {
       setLibraryLoading(true);
       const { data, error } = await supabase
         .from("books")
-        .select("id, title, cover_url")
+        .select("id, title, author, tagline, type")
         .eq("is_public", true)
         .eq("status", "done")
         .eq("language", learningLanguage)
@@ -348,9 +455,12 @@ export default function LandingPreview() {
       {/* ================= LIBRARY ================= */}
       <section id="library" className="library-section">
         <div className="section-shell">
-          <h2 style={{ fontFamily: "var(--serif)", fontWeight: 400, fontSize: 32, margin: 0 }}>
-            Not sure where to begin?
-          </h2>
+          <div className="library-head">
+            <h2 style={{ fontFamily: "var(--serif)", fontWeight: 400, fontSize: 32, margin: 0 }}>
+              Choose something to read
+            </h2>
+            <LibraryLanguageSelect value={learningLanguage} onChange={setLearningLanguage} />
+          </div>
 
           {libraryLoading ? (
             <p style={{ marginTop: 40, color: "#7a827e" }}>Loading...</p>
@@ -364,15 +474,16 @@ export default function LandingPreview() {
           ) : (
             <div className="books-grid" style={{ marginTop: 40 }}>
               {libraryBooks.map((book, i) => {
-                const tones = ["gold", "brick", "blue", "forest"];
-                const tone = tones[i % tones.length];
+                const bg = COVER_TONES[i % COVER_TONES.length];
+                const textColor = getReadableTextColor(bg);
                 return (
                   <Link key={book.id} href={`/reader/${book.id}`} className="book-item">
-                    <div
-                      className={`book-cover ${book.cover_url ? "" : tone}`}
-                      style={book.cover_url ? { backgroundImage: `url(${book.cover_url})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
-                    >
-                      {!book.cover_url && <span className="cover-mark">B</span>}
+                    <div className="book-cover" style={{ background: bg, color: textColor }}>
+                      {book.author && <span className="book-cover-author">{book.author}</span>}
+                      <strong className="book-cover-title">{book.title}</strong>
+                      <span className="book-cover-tag">
+                        {book.tagline || (book.type === "retelling" ? "Retelling" : "Original")}
+                      </span>
                     </div>
                     <p style={{ marginTop: 10, fontSize: 14, fontFamily: "var(--serif)", color: "#2b2b23" }}>
                       {book.title}

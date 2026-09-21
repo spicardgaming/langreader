@@ -12,6 +12,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [title, setTitle] = useState("");
+  const [author, setAuthor] = useState("");
+  const [tagline, setTagline] = useState("");
   const [language, setLanguage] = useState("en");
   const [type, setType] = useState<"original" | "retelling">("original");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -149,6 +151,8 @@ if (coverFile) {
   .insert({
     user_id: session.user.id,
     title: title.trim(),
+    author: author.trim() || null,
+    tagline: tagline.trim() || null,
     original_text: fileContent,
     retelling_text: '',
     text_hash: textHash,
@@ -180,6 +184,8 @@ setUploadMessage('Book uploaded and formatted successfully');
         setCoverPreview(null);
         // Clear form
         setTitle('');
+        setAuthor('');
+        setTagline('');
         setLanguage('en');
         setType('original');
         setSelectedFile(null);
@@ -192,6 +198,8 @@ setUploadMessage('Book uploaded and formatted successfully');
           .insert({
             user_id: session.user.id,
             title: title.trim(),
+            author: author.trim() || null,
+            tagline: tagline.trim() || null,
             original_text: fileContent,
             retelling_text: '',
             text_hash: textHash,
@@ -225,6 +233,8 @@ setUploadMessage('Book uploaded and formatted successfully');
         
         // Clear form
         setTitle('');
+        setAuthor('');
+        setTagline('');
         setLanguage('en');
         setType('original');
         setSelectedFile(null);
@@ -274,6 +284,37 @@ setUploadMessage('Book uploaded and formatted successfully');
             onChange={(e) => setTitle(e.target.value)}
             className="w-full rounded-lg border border-[#e7e5e4] bg-white px-4 py-2 text-sm text-[#1a1a1a]"
           />
+        </div>
+
+        {/* Author input (optional) */}
+        <div>
+          <label htmlFor="author" className="block text-sm font-medium text-[#1a1a1a] mb-1">
+            Author <span className="font-normal text-[#a8a29e]">(optional)</span>
+          </label>
+          <input
+            id="author"
+            type="text"
+            placeholder="e.g. Lewis Carroll"
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+            className="w-full rounded-lg border border-[#e7e5e4] bg-white px-4 py-2 text-sm text-[#1a1a1a]"
+          />
+        </div>
+
+        {/* Tagline input (optional) */}
+        <div>
+          <label htmlFor="tagline" className="block text-sm font-medium text-[#1a1a1a] mb-1">
+            Tagline <span className="font-normal text-[#a8a29e]">(optional)</span>
+          </label>
+          <input
+            id="tagline"
+            type="text"
+            placeholder="e.g. A classic tale"
+            value={tagline}
+            onChange={(e) => setTagline(e.target.value)}
+            className="w-full rounded-lg border border-[#e7e5e4] bg-white px-4 py-2 text-sm text-[#1a1a1a]"
+          />
+          <p className="mt-1 text-xs text-[#a8a29e]">Shown on the book cover. If left blank, the cover shows Original/Retelling instead.</p>
         </div>
 
         {/* Language select */}
