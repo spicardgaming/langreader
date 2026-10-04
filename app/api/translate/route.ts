@@ -9,6 +9,8 @@ type TranslateRequest = {
   isParagraph?: boolean;
   nativeLanguage?: string;
   learningLanguage?: string;
+  includeExamples?: boolean;
+  includeVerbForms?: boolean;
 };
 
 type Example = {
@@ -68,28 +70,48 @@ function isValidVerbForms(value: unknown): value is VerbForms {
   );
 }
 
-function parseWordJsonFromText(text: string): WordTranslateResponse {
+function parseWordJsonFromText(
+  text: string,
+  expectExamples: boolean,
+  expectVerbForms: boolean,
+): WordTranslateResponse {
   const parsed = JSON.parse(extractJsonText(text)) as WordTranslateResponse;
 
   if (
     typeof parsed.translation !== "string" ||
     typeof parsed.transcription !== "string" ||
-    !Array.isArray(parsed.examples) ||
-    parsed.examples.length !== 2 ||
-    !parsed.examples.every(
-      (e) =>
-        typeof e === "object" &&
-        e !== null &&
-        typeof (e as Example).english === "string" &&
-        (typeof (e as Example).russian === "string" || typeof (e as Example).translation === "string"),
-    ) ||
-    typeof parsed.isVerb !== "boolean" ||
-    (parsed.isVerb && !isValidVerbForms(parsed.verbForms)) ||
-    (!parsed.isVerb &&
-      parsed.verbForms !== null &&
-      parsed.verbForms !== undefined)
+    typeof parsed.isVerb !== "boolean"
   ) {
     throw new Error("Invalid response shape from model");
+  }
+
+  if (expectExamples) {
+    if (
+      !Array.isArray(parsed.examples) ||
+      parsed.examples.length !== 2 ||
+      !parsed.examples.every(
+        (e) =>
+          typeof e === "object" &&
+          e !== null &&
+          typeof (e as Example).english === "string" &&
+          (typeof (e as Example).russian === "string" || typeof (e as Example).translation === "string"),
+      )
+    ) {
+      throw new Error("Invalid response shape from model");
+    }
+  } else if (!Array.isArray(parsed.examples)) {
+    parsed.examples = [];
+  }
+
+  if (expectVerbForms) {
+    if (
+      (parsed.isVerb && !isValidVerbForms(parsed.verbForms)) ||
+      (!parsed.isVerb && parsed.verbForms !== null && parsed.verbForms !== undefined)
+    ) {
+      throw new Error("Invalid response shape from model");
+    }
+  } else {
+    parsed.verbForms = null;
   }
 
   return parsed;
@@ -156,7 +178,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-const { word, context, isPhrase, isParagraph, nativeLanguage = 'Russian', learningLanguage = 'en' } = body;  if (!word || typeof word !== "string") {
+  const {
+    word,
+    context,
+    isPhrase,
+    isParagraph,
+    nativeLanguage = 'Russian',
+    learningLanguage = 'en',
+    includeExamples = true,
+    includeVerbForms = true,
+  } = body;
+  if (!word || typeof word !== "string") {
     return NextResponse.json({ error: "word is required" }, { status: 400 });
   }
   if (!isParagraph && typeof context !== "string") {
@@ -171,6 +203,22 @@ const { word, context, isPhrase, isParagraph, nativeLanguage = 'Russian', learni
   };
   const targetLanguage = LANGUAGE_NAMES[nativeLanguage] ?? 'Russian';
   const sourceLanguage = LANGUAGE_NAMES[learningLanguage] ?? 'English';
+
+  const examplesFieldSpec = includeExamples
+    ? `- "examples": array of exactly 2 objects, each with:
+  - "english": an example sentence in ${sourceLanguage} that uses the word naturally
+  - "translation": ${targetLanguage} translation of that sentence`
+    : `- "examples": always an empty array []`;
+
+  const verbFormsFieldSpec = includeVerbForms
+    ? `- "verbForms": if isVerb is true, an object with:
+  - "tense": name of the ${sourceLanguage} tense/mood as used in the context, labeled in English (e.g. "Present Simple", "Preterite", "Subjunctive")
+  - "forms": array of ALL conjugation forms for that tense only of the verb's lemma (infinitive) IN ${sourceLanguage}, each object with:
+    - "name": English label for the grammatical person (e.g. "I", "You", "He/She/It", "We", "They", or the appropriate persons for ${sourceLanguage} grammar)
+    - "form": the ${sourceLanguage} verb form
+  If isVerb is false, set "verbForms" to null`
+    : `- "verbForms": always null (do not generate conjugation forms, just determine isVerb)`;
+
   const prompt = isParagraph
     ? `You are helping a ${targetLanguage} speaker learn ${sourceLanguage}.
 Translate the following ${sourceLanguage} paragraph into ${targetLanguage} completely. Do not shorten, summarize, or omit any part of the text.
@@ -184,7 +232,7 @@ Return ONLY valid JSON (no markdown, no text outside JSON) with exactly this fie
 Example format:
 {"paragraphTranslation":"..."}`
     : isPhrase
-? `You are helping a ${targetLanguage} speaker learn ${sourceLanguage}.
+      ? `You are helping a ${targetLanguage} speaker learn ${sourceLanguage}.
 
 Phrase (in ${sourceLanguage}): "${word}"
 Context sentence: "${context}"
@@ -195,36 +243,24 @@ Return ONLY valid JSON (no markdown, no text outside JSON) with exactly these fi
 
 Example format:
 {"translation":"...","explanation":"..."}`
-: `You are helping a ${targetLanguage} speaker learn ${sourceLanguage} vocabulary.
+      : `You are helping a ${targetLanguage} speaker learn ${sourceLanguage} vocabulary.
 
 Word (in ${sourceLanguage}): "${word}"
 Context sentence: "${context}"
 
 First determine whether the word is used as a verb in this context sentence.
-If it is a verb, identify which ${sourceLanguage} tense/mood it is used in within that context.
 
 Return ONLY valid JSON (no markdown, no explanation) with exactly these fields:
 - "translation": ${targetLanguage} translation of the word in this context
 - "transcription": IPA phonetic transcription of the ${sourceLanguage} word
-- "examples": array of exactly 2 objects, each with:
-  - "english": an example sentence in ${sourceLanguage} that uses the word naturally
-  - "translation": ${targetLanguage} translation of that sentence
-
+${examplesFieldSpec}
 - "isVerb": boolean — true if the word is a verb in this context
-- "verbForms": if isVerb is true, an object with:
-  - "tense": name of the ${sourceLanguage} tense/mood as used in the context, labeled in English (e.g. "Present Simple", "Preterite", "Subjunctive")
-  - "forms": array of ALL conjugation forms for that tense only of the verb's lemma (infinitive) IN ${sourceLanguage}, each object with:
-    - "name": English label for the grammatical person (e.g. "I", "You", "He/She/It", "We", "They", or the appropriate persons for ${sourceLanguage} grammar)
-    - "form": the ${sourceLanguage} verb form
+${verbFormsFieldSpec}
 
-  Keep "translation", "examples[].translation", and all other learner-facing explanations in ${targetLanguage}. Only "tense" and form "name" labels are in English.
-  If isVerb is false, set "verbForms" to null
+Keep "translation" and all other learner-facing explanations in ${targetLanguage}.
 
-Example format (non-verb):
-{"translation":"...","transcription":"...","examples":[...],"isVerb":false,"verbForms":null}
-
-Example format (verb):
-{"translation":"...","transcription":"...","examples":[...],"isVerb":true,"verbForms":{"tense":"Past Simple","forms":[{"name":"I","form":"walked"},{"name":"He/She/It","form":"walked"}]}}`;
+Example format:
+{"translation":"...","transcription":"...","examples":${includeExamples ? "[...]" : "[]"},"isVerb":false,"verbForms":null}`;
 
   const anthropicResponse = await fetch(
     "https://api.anthropic.com/v1/messages",
@@ -237,7 +273,13 @@ Example format (verb):
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: isParagraph ? 1024 : isPhrase ? 512 : 768,
+        max_tokens: isParagraph
+          ? 1024
+          : isPhrase
+            ? 512
+            : includeExamples || includeVerbForms
+              ? 768
+              : 400,
         messages: [{ role: "user", content: prompt }],
       }),
     },
@@ -269,7 +311,7 @@ Example format (verb):
       ? parseParagraphJsonFromText(text)
       : isPhrase
         ? parsePhraseJsonFromText(text)
-        : parseWordJsonFromText(text);
+        : parseWordJsonFromText(text, includeExamples, includeVerbForms);
     return NextResponse.json(result);
   } catch {
     return NextResponse.json(
