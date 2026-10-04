@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAllowedOrigin, isExtensionOrigin } from "@/lib/security/originGuard";
+import { checkAndIncrementAnonUsage } from "@/lib/security/anonRateLimit";
 
 type TranslateRequest = {
   word: string;
@@ -117,6 +119,28 @@ function parseParagraphJsonFromText(text: string): ParagraphTranslateResponse {
 }
 
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get("origin");
+
+  if (!isAllowedOrigin(origin)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Anonymous traffic (extension, no account) is rate-limited by device id.
+  // Our own site's requests are unaffected — same behavior as before.
+  if (isExtensionOrigin(origin)) {
+    const deviceId = request.headers.get("x-balaka-device-id");
+    if (!deviceId) {
+      return NextResponse.json({ error: "Missing device id" }, { status: 400 });
+    }
+    const { allowed } = await checkAndIncrementAnonUsage(deviceId, "translate");
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Monthly limit reached", code: "LIMIT_REACHED" },
+        { status: 429 },
+      );
+    }
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -139,29 +163,12 @@ const { word, context, isPhrase, isParagraph, nativeLanguage = 'Russian', learni
     return NextResponse.json({ error: "context is required" }, { status: 400 });
   }
 
-  // Keep this map in sync with ALL_LANGUAGES in app/components/Header.tsx and
-  // the language dropdown in app/admin/page.tsx — a code missing here silently
-  // falls back to Russian/English below (logged as a warning so it's at least
-  // visible in the server logs rather than only surfacing as a wrong-language
-  // translation with no trace of why).
   const LANGUAGE_NAMES: Record<string, string> = {
     en: 'English', es: 'Spanish', fr: 'French', de: 'German',
     it: 'Italian', pt: 'Portuguese', ru: 'Russian', uk: 'Ukrainian', ca: 'Catalan',
     zh: 'Chinese', ja: 'Japanese', ko: 'Korean', ar: 'Arabic', hi: 'Hindi',
     tr: 'Turkish', pl: 'Polish', nl: 'Dutch', vi: 'Vietnamese', th: 'Thai', id: 'Indonesian',
-    bn: 'Bengali', fa: 'Persian', he: 'Hebrew', ur: 'Urdu', ro: 'Romanian',
-    hu: 'Hungarian', cs: 'Czech', sk: 'Slovak', bg: 'Bulgarian', el: 'Greek',
-    sv: 'Swedish', no: 'Norwegian', da: 'Danish', fi: 'Finnish', sr: 'Serbian',
-    hr: 'Croatian', ms: 'Malay', sw: 'Swahili', az: 'Azerbaijani', ka: 'Georgian', hy: 'Armenian',
   };
-
-  if (!LANGUAGE_NAMES[nativeLanguage]) {
-    console.warn(`/api/translate: unknown nativeLanguage code "${nativeLanguage}", falling back to Russian`);
-  }
-  if (!LANGUAGE_NAMES[learningLanguage]) {
-    console.warn(`/api/translate: unknown learningLanguage code "${learningLanguage}", falling back to English`);
-  }
-
   const targetLanguage = LANGUAGE_NAMES[nativeLanguage] ?? 'Russian';
   const sourceLanguage = LANGUAGE_NAMES[learningLanguage] ?? 'English';
   const prompt = isParagraph
