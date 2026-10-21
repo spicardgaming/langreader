@@ -141,7 +141,7 @@ Minimal example when nothing special applies:
       },
       body: JSON.stringify({
         model: "claude-haiku-5-5",
-        max_tokens: 512,
+        max_tokens: 1024,
         messages: [{ role: "user", content: prompt }],
       }),
     },
@@ -155,8 +155,10 @@ Minimal example when nothing special applies:
     );
   }
 
-  const data = (await anthropicResponse.json()) as {
+    const data = (await anthropicResponse.json()) as {
     content?: { type: string; text?: string }[];
+    stop_reason?: string;
+    usage?: unknown;
   };
 
   const textBlock = data.content?.find((block) => block.type === "text");
@@ -173,7 +175,13 @@ Minimal example when nothing special applies:
     return NextResponse.json(result);
   } catch {
     return NextResponse.json(
-      { error: "Failed to parse model response", raw: responseText },
+            {
+        error: "Failed to parse model response",
+        raw: responseText,
+        stop_reason: data.stop_reason,
+        usage: data.usage,
+        block_types: data.content?.map((b) => b.type),
+      },
       { status: 502 },
     );
   }
