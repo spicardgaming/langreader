@@ -2,229 +2,214 @@ export default function PrivacyPolicyPage() {
   return (
     <div className="max-w-[800px] mx-auto py-12 px-4">
       <h1 className="mb-2 text-2xl font-semibold text-[#1a1a1a]">Privacy Policy</h1>
-      <p className="mb-8 text-xs text-[#a8a29e]">Last updated: [fill in date of publishing]</p>
+      <p className="mb-8 text-xs text-[#a8a29e]">Last updated: October 23, 2026</p>
 
       <div className="space-y-6 text-sm leading-relaxed text-[#57534e] sm:text-base">
         <p>
-          Balaka is a language-learning reading service provided by Oleksandr Zlydennyi
-          (&quot;Balaka&quot;, &quot;we&quot;, &quot;our&quot;, or &quot;us&quot;), an individual
-          operating from Spain. This Privacy Policy explains what personal data we collect when
-          you use Balaka, why we collect it, and what rights you have over it.
-        </p>
-        <p>
-          We&apos;re not a large company with a dedicated legal team — Balaka is currently a
-          one-person project. We&apos;ve written this policy in plain language on purpose, and we
-          try to only collect what we actually need to run the service.
+          Balaka is a language-learning reading service, including a website and a browser
+          extension. This Privacy Policy explains what personal data we collect, why we collect
+          it, and what rights you have over it. We only collect what we need to run the service.
         </p>
 
         <section>
           <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">1. Who is responsible for your data</h2>
           <p>
-            Oleksandr Zlydennyi, an individual based in Spain, is the data controller for the
-            personal data described in this policy.
+            The data controller for the personal data described in this policy is:
           </p>
-          <ul className="mt-3 space-y-1">
-            <li>Tax ID (NIF/NIE): <span className="text-[#a8a29e]">[to be added once registered as autónomo in Spain]</span></li>
-            <li>Contact email: <span className="text-[#a8a29e]">[to be added]</span></li>
+          <ul className="mt-3 list-none space-y-1">
+            <li>
+              <strong className="text-[#1a1a1a]">Name:</strong> YOUR FULL NAME
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Tax ID (NIF):</strong> YOUR NIF
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Address:</strong> YOUR POSTAL ADDRESS, Spain
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Email:</strong>{' '}
+              <a href="mailto:admin@balaka.app" className="text-[#1a1a1a] underline underline-offset-2">
+                admin@balaka.app
+              </a>
+            </li>
           </ul>
         </section>
 
         <section>
           <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">2. What data we collect</h2>
-          <p className="mb-3">
-            <strong className="text-[#1a1a1a]">Account data.</strong> When you register, we
-            collect your email address and password. Your password is handled by our
-            authentication provider (Supabase Auth) and is never stored or seen by us in plain text.
-          </p>
-          <p className="mb-3">
-            <strong className="text-[#1a1a1a]">Language preferences.</strong> The language
-            you&apos;re learning and your native language, so we can show translations correctly.
-          </p>
-          <p className="mb-3">
-            <strong className="text-[#1a1a1a]">Content you upload.</strong> If you upload your own
-            texts (as .txt, .epub, or .pdf files) to read or have simplified, we store that text
-            so the service can process and display it back to you. You&apos;re responsible for
-            having the right to use and upload that content — see our{' '}
-            <a href="/termsOfService" className="text-[#1a1a1a] underline underline-offset-2">
-              Terms of Service
-            </a>{' '}
-            for more on this.
-          </p>
-          <p className="mb-3">
-            <strong className="text-[#1a1a1a]">Usage and learning data.</strong> Words and phrases
-            you save as flashcards, your reading progress in each book, and how many characters
-            you&apos;ve processed this month (used only to apply the monthly Pro-plan limit).
-          </p>
-          <p className="mb-3">
-            <strong className="text-[#1a1a1a]">Payment data.</strong> If you subscribe to Pro,
-            payments are handled entirely by Stripe, our payment processor. We never see or store
-            your full card details — we only receive confirmation that a payment succeeded or
-            failed, and a Stripe-issued reference we use to manage your subscription.
-          </p>
-          <p className="mb-3">
-            <strong className="text-[#1a1a1a]">Technical data.</strong> Standard technical
-            information generated by using a website — for example IP address and browser
-            information, handled as part of normal hosting and security operations by our
-            infrastructure providers.
-          </p>
-          <p>
-            We do <strong className="text-[#1a1a1a]">not</strong> currently use cookies for
-            advertising or tracking, and we don&apos;t currently run any analytics tool. If that
-            changes (for example, if we add Google Analytics), we&apos;ll update this policy
-            first and, where required, ask for your consent before setting non-essential cookies.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="mb-3 text-lg font-medium text-[#1a1a1a]">3. Why we process your data, and on what legal basis</h2>
-          <div className="space-y-3">
-            <div className="rounded-lg border border-[#e7e5e4] bg-white p-4">
-              <p className="text-[#1a1a1a]">Create and manage your account</p>
-              <p className="mt-1 text-xs text-[#a8a29e]">Legal basis: performance of a contract</p>
-            </div>
-            <div className="rounded-lg border border-[#e7e5e4] bg-white p-4">
-              <p className="text-[#1a1a1a]">Translate words, phrases, and texts you read</p>
-              <p className="mt-1 text-xs text-[#a8a29e]">Legal basis: performance of a contract</p>
-            </div>
-            <div className="rounded-lg border border-[#e7e5e4] bg-white p-4">
-              <p className="text-[#1a1a1a]">Process texts you upload (formatting, simplification)</p>
-              <p className="mt-1 text-xs text-[#a8a29e]">Legal basis: performance of a contract</p>
-            </div>
-            <div className="rounded-lg border border-[#e7e5e4] bg-white p-4">
-              <p className="text-[#1a1a1a]">Process your Pro subscription payment</p>
-              <p className="mt-1 text-xs text-[#a8a29e]">Legal basis: performance of a contract</p>
-            </div>
-            <div className="rounded-lg border border-[#e7e5e4] bg-white p-4">
-              <p className="text-[#1a1a1a]">Enforce monthly usage limits</p>
-              <p className="mt-1 text-xs text-[#a8a29e]">Legal basis: legitimate interest</p>
-            </div>
-            <div className="rounded-lg border border-[#e7e5e4] bg-white p-4">
-              <p className="text-[#1a1a1a]">Respond to support requests</p>
-              <p className="mt-1 text-xs text-[#a8a29e]">Legal basis: legitimate interest / contract</p>
-            </div>
-            <div className="rounded-lg border border-[#e7e5e4] bg-white p-4">
-              <p className="text-[#1a1a1a]">Keep basic security and technical logs</p>
-              <p className="mt-1 text-xs text-[#a8a29e]">Legal basis: legitimate interest</p>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">4. Who we share your data with</h2>
-          <p className="mb-3">
-            We use a small number of third-party services to run Balaka. Each of them only
-            receives the data they need to do their specific job:
-          </p>
           <ul className="list-disc space-y-2 pl-5">
-            <li><strong className="text-[#1a1a1a]">Supabase</strong> (database, authentication, and file storage) — hosted in the EU. Stores your account data, uploaded texts, saved cards, and reading progress.</li>
-            <li><strong className="text-[#1a1a1a]">Vercel</strong> (website hosting) — serves the Balaka website itself.</li>
-            <li><strong className="text-[#1a1a1a]">Railway</strong> (text-processing server) — handles the heavier parts of processing longer texts (formatting, simplification, extracting text from epub/PDF files).</li>
-            <li><strong className="text-[#1a1a1a]">Stripe</strong> (payments) — processes your subscription payment. We never see your full card number.</li>
-            <li><strong className="text-[#1a1a1a]">Anthropic</strong> (Claude AI) — the AI model that powers translations, simplified retellings, and text formatting. The specific text you&apos;re translating or the book content you upload is sent to Anthropic to generate that result. Anthropic is based in the United States; this involves a transfer of data outside the EU/EEA, which we rely on Anthropic&apos;s own data processing terms and Standard Contractual Clauses to safeguard.</li>
+            <li>
+              <strong className="text-[#1a1a1a]">Account data:</strong> your email address and
+              password. Your password is handled by our authentication provider and is never
+              visible to us in plain text.
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Language preferences:</strong> the language you
+              are learning and your native language.
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Content you upload:</strong> texts you upload
+              (.txt, .epub, .pdf) so we can process and show them back to you. You are
+              responsible for having the right to use that content — see our{' '}
+              <a href="/termsOfService" className="text-[#1a1a1a] underline underline-offset-2">
+                Terms of Service
+              </a>
+              .
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Learning data:</strong> words and phrases you
+              save as flashcards, your reading progress, and how many characters you have
+              processed this month (to apply the Pro plan limit).
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Payment data:</strong> if you subscribe to Pro,
+              payments are handled by Stripe. We never see or store your full card details; we
+              only receive confirmation of payment and a reference to manage your subscription.
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Technical data:</strong> standard information
+              such as IP address and browser type, handled by our hosting providers for normal
+              operation and security.
+            </li>
           </ul>
           <p className="mt-3">
-            We do not sell your personal data, and we do not share it with anyone for advertising
-            purposes. If we add new third-party providers in the future (for example, a
-            text-to-speech provider for audio features, or an analytics tool), we&apos;ll update
-            this section before those features go live.
+            We do not use cookies for advertising or tracking and we do not run analytics tools.
+            If that changes, we will update this policy first and, where required, ask for your
+            consent.
           </p>
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">5. How long we keep your data</h2>
-          <p>
-            We keep your account data and content for as long as your account is active. If you
-            ask us to delete your account (see Section 7), we&apos;ll delete your personal data
-            and content, except where we&apos;re legally required to keep certain records (for
-            example, payment records for tax purposes) or where data remains briefly in routine
-            backups.
+          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">3. Why we use your data</h2>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              To create and manage your account, translate and process the texts you read or
+              upload, and process your Pro subscription payment. Legal basis:{' '}
+              <strong className="text-[#1a1a1a]">performance of a contract</strong>.
+            </li>
+            <li>
+              To enforce usage limits, answer support requests, and keep basic security and
+              technical logs. Legal basis:{' '}
+              <strong className="text-[#1a1a1a]">legitimate interests</strong>.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">4. Who receives your data</h2>
+          <p className="mb-3">
+            We use a small number of service providers, each receiving only what it needs:
+          </p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>Database, authentication, file storage and website hosting providers (our database is hosted in the EU).</li>
+            <li>
+              <strong className="text-[#1a1a1a]">Stripe</strong> — payment processing.
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Anthropic</strong> (Claude AI) — the text you
+              translate, or the text you upload for retelling or formatting, is sent to Anthropic
+              to generate the result.
+            </li>
+          </ul>
+          <p className="mt-3">
+            We do not sell your personal data and we do not share it for advertising. If we add
+            new providers, we will update this section before the related feature goes live.
           </p>
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">6. International data transfers</h2>
+          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">5. International transfers</h2>
           <p>
-            Most of our infrastructure (Supabase) is hosted in the EU. Some of our providers —
-            notably Anthropic and Stripe — are based in the United States, which means some of
-            your data is transferred outside the EU/EEA when we use their services. We rely on
-            the safeguards those providers have in place, including Standard Contractual Clauses,
-            to protect your data during these transfers.
+            Anthropic and Stripe are based in the United States, so some of your data is
+            transferred outside the EU/EEA when you use features that rely on them. We rely on
+            their data processing terms and Standard Contractual Clauses to protect your data.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">6. How long we keep your data</h2>
+          <p>
+            We keep your account data and content while your account is active. If you ask us to
+            delete your account, we delete your personal data and content, except where we must
+            keep certain records by law (for example, payment records for tax purposes) or where
+            data remains briefly in routine backups.
           </p>
         </section>
 
         <section>
           <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">7. Your rights</h2>
           <p className="mb-3">
-            If you&apos;re in the EU/EEA (or covered by similar data protection law elsewhere),
-            you have the right to:
+            If you are in the EU/EEA (or covered by similar law elsewhere), you have the right to
+            access, correct, delete, restrict or object to the processing of your data, and to
+            receive your data in a portable format.
           </p>
-          <ul className="list-disc space-y-1 pl-5">
-            <li><strong className="text-[#1a1a1a]">Access</strong> the personal data we hold about you</li>
-            <li><strong className="text-[#1a1a1a]">Correct</strong> inaccurate data</li>
-            <li><strong className="text-[#1a1a1a]">Delete</strong> your data (&quot;right to be forgotten&quot;)</li>
-            <li><strong className="text-[#1a1a1a]">Restrict or object to</strong> certain processing</li>
-            <li><strong className="text-[#1a1a1a]">Data portability</strong> — receive your data in a portable format</li>
-          </ul>
-          <p className="mt-3 mb-3">
-            <strong className="text-[#1a1a1a]">Deleting your account:</strong> at the moment,
-            account deletion is handled manually rather than through a self-service button in the
-            app. To request deletion of your account and data, please email us at{' '}
-            <span className="text-[#a8a29e]">[contact email]</span> and we&apos;ll process your
-            request promptly.
-          </p>
-          <p>
-            To exercise any other right, contact us at the email above. If you&apos;re not
-            satisfied with how we&apos;ve handled your request, you have the right to complain to
-            the Spanish data protection authority (Agencia Española de Protección de Datos,
-            AEPD) or your local equivalent.
+          <p className="mb-3">
+            Account deletion is currently handled manually: email us at{' '}
+            <a href="mailto:admin@balaka.app" className="text-[#1a1a1a] underline underline-offset-2">
+              admin@balaka.app
+            </a>{' '}
+            and we will process your request promptly. For any other request, use the same
+            address. You also have the right to complain to the Spanish data protection authority
+            (Agencia Española de Protección de Datos, AEPD) or your local equivalent.
           </p>
         </section>
 
         <section>
           <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">8. Children</h2>
           <p>
-            Balaka is not directed at children under 14. In line with Spanish law on digital
-            consent, you must be at least 14 years old to create an account. If you believe a
-            child under 14 has created an account, please contact us and we will remove it.
+            Balaka is not directed at children under 14. You must be at least 14 years old to
+            create an account. If you believe a child under 14 has created an account, contact us
+            and we will remove it.
           </p>
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">9. Security</h2>
-          <p>
-            We take reasonable technical and organizational measures to protect your data,
-            including relying on our infrastructure providers&apos; own security practices
-            (encryption in transit, access controls, etc.). No online service can guarantee
-            complete security, but we take this seriously given the personal nature of the data
-            involved.
-          </p>
+          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">9. Balaka browser extension</h2>
+          <p className="mb-3">If you use the Balaka Chrome extension:</p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <strong className="text-[#1a1a1a]">What is sent.</strong> Only when you click
+              Translate or Explain, the text you selected and the sentence or paragraph around it
+              are sent to our server and then to our AI provider (Anthropic) to produce the
+              translation or explanation. The extension does not read or send any other page
+              content and does not track your browsing history.
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">What is stored on your device.</strong> Your
+              saved words (with the address of the page you saved them from), your language
+              settings (which Chrome may sync across your devices through your Google account),
+              and a random device identifier used to count free monthly usage.
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">What we keep.</strong> We do not store the
+              selected text or its translation on our servers. We keep a request count linked to
+              the random device identifier for as long as needed to apply monthly free-usage
+              limits.
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">No selling, no ads.</strong> We use this data
+              only to provide translation and explanation features. We do not sell it or use it
+              for advertising.
+            </li>
+            <li>
+              <strong className="text-[#1a1a1a]">Removal.</strong> Uninstalling the extension
+              deletes everything stored on your device.
+            </li>
+          </ul>
         </section>
 
         <section>
-          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">10. Changes to this policy</h2>
+          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">10. Changes and contact</h2>
           <p>
-            We may update this Privacy Policy from time to time, for example as we add new
-            features or providers. If we make a material change, we&apos;ll give notice — for
-            example by email or a notice on the Service — before it takes effect.
+            We may update this policy as we add features or providers. If we make a material
+            change, we will give notice, for example by email or a notice on the service, before
+            it takes effect. Questions about this policy? Write to{' '}
+            <a href="mailto:admin@balaka.app" className="text-[#1a1a1a] underline underline-offset-2">
+              admin@balaka.app
+            </a>
+            .
           </p>
         </section>
-
-        <section>
-          <h2 className="mb-2 text-lg font-medium text-[#1a1a1a]">11. Contact us</h2>
-          <p>
-            If you have questions about this policy or how we handle your data, contact us at{' '}
-            <span className="text-[#a8a29e]">[contact email]</span>.
-          </p>
-        </section>
-
-        <p className="border-t border-[#e7e5e4] pt-6 text-xs italic text-[#a8a29e]">
-          This policy was drafted to accurately reflect how Balaka currently operates, but it is
-          not a substitute for professional legal advice. Given that Balaka processes payments
-          and personal data internationally, we recommend a qualified lawyer review this policy
-          before it is treated as final, particularly regarding the exact wording required for a
-          sole individual (rather than a registered company) acting as data controller under
-          Spanish and EU law.
-        </p>
       </div>
     </div>
   );
