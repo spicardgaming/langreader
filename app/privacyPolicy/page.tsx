@@ -18,13 +18,13 @@ export default function PrivacyPolicyPage() {
           </p>
           <ul className="mt-3 list-none space-y-1">
             <li>
-              <strong className="text-[#1a1a1a]">Name:</strong> YOUR FULL NAME
+              <strong className="text-[#1a1a1a]">Name:</strong> Oleksandr Zlydennyi
             </li>
             <li>
-              <strong className="text-[#1a1a1a]">Tax ID (NIF):</strong> YOUR NIF
+              <strong className="text-[#1a1a1a]">Tax ID (NIF):</strong> ---
             </li>
             <li>
-              <strong className="text-[#1a1a1a]">Address:</strong> YOUR POSTAL ADDRESS, Spain
+              <strong className="text-[#1a1a1a]">Address:</strong> 08001, Spain
             </li>
             <li>
               <strong className="text-[#1a1a1a]">Email:</strong>{' '}
