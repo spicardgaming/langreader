@@ -142,6 +142,8 @@ Minimal example when nothing special applies:
       body: JSON.stringify({
         model: "claude-haiku-5-5",
         max_tokens: 1024,
+        // Haiku 5.5 may spend its token budget on a "thinking" block and return no text.
+        thinking: { type: "disabled" },
         messages: [{ role: "user", content: prompt }],
       }),
     },

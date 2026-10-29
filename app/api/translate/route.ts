@@ -280,6 +280,8 @@ Example format:
             : includeExamples || includeVerbForms
               ? 768
               : 400,
+        // Haiku 5.5 may spend its token budget on a "thinking" block and return no text.
+        thinking: { type: "disabled" },
         messages: [{ role: "user", content: prompt }],
       }),
     },
